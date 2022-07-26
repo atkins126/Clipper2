@@ -1,7 +1,7 @@
 ﻿/*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  Clipper2 - beta                                                 *
-* Date      :  12 July 2022                                                    *
+* Date      :  23 July 2022                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  This module contains simple functions that will likely cover    *
@@ -20,8 +20,8 @@ using System.Runtime.CompilerServices;
 namespace Clipper2Lib
 {
 
-  //PRE-COMPILER CONDITIONAL ...
-  //USINGZ: For user defined Z-coordinates. See Clipper.SetZ
+  // PRE-COMPILER CONDITIONAL ...
+  // USINGZ: For user defined Z-coordinates. See Clipper.SetZ
 
   using Path64 = List<Point64>;
   using Paths64 = List<List<Point64>>;
@@ -132,10 +132,9 @@ namespace Clipper2Lib
       tmp = co.Execute(delta * scale);
       return ScalePathsD(tmp, 1/scale);
     }
-    public static double Area(Path64 path, 
-      bool OrientationIsReversed = InternalClipper.DEFAULT_ORIENTATION_IS_REVERSED)
+    public static double Area(Path64 path)
     {
-      //https://en.wikipedia.org/wiki/Shoelace_formula
+      // https://en.wikipedia.org/wiki/Shoelace_formula
       double a = 0.0;
       int cnt = path.Count;
       if (cnt < 3) return 0.0;
@@ -145,23 +144,18 @@ namespace Clipper2Lib
         a += (double) (prevPt.Y + pt.Y) * (prevPt.X - pt.X);
         prevPt = pt;
       }
-      if (OrientationIsReversed)
-        return a * -0.5; 
-      else
-        return a * 0.5;
+      return a * 0.5;
     }
 
-    public static double Area(Paths64 paths,
-      bool OrientationIsReversed = InternalClipper.DEFAULT_ORIENTATION_IS_REVERSED)
+    public static double Area(Paths64 paths)
     {
       double a = 0.0;
-      foreach (Path64 path in paths)
-        a += Area(path, OrientationIsReversed);
+      foreach (Path64 path in paths) 
+        a += Area(path);
       return a;
     }
 
-    public static double Area(PathD path,
-      bool OrientationIsReversed = InternalClipper.DEFAULT_ORIENTATION_IS_REVERSED)
+    public static double Area(PathD path)
     {
       double a = 0.0;
       int cnt = path.Count;
@@ -172,33 +166,27 @@ namespace Clipper2Lib
         a += (prevPt.y + pt.y) * (prevPt.x - pt.x);
         prevPt = pt;
       }
-      if (OrientationIsReversed)
-        return a * -0.5;
-      else
-        return a * 0.5;
+      return a * 0.5;
     }
 
-    public static double Area(PathsD paths,
-      bool orientation_is_reversed = InternalClipper.DEFAULT_ORIENTATION_IS_REVERSED)
+    public static double Area(PathsD paths)
     {
       double a = 0.0;
       foreach (PathD path in paths)
-        a += Area(path, orientation_is_reversed);
+        a += Area(path);
       return a;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsPositive(Path64 poly,
-      bool orientation_is_reversed = InternalClipper.DEFAULT_ORIENTATION_IS_REVERSED)
+    public static bool IsPositive(Path64 poly)
     {
-      return Area(poly, orientation_is_reversed) >= 0;
+      return Area(poly) >= 0;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsPositive(PathD poly,
-      bool orientation_is_reversed = InternalClipper.DEFAULT_ORIENTATION_IS_REVERSED)
+    public static bool IsPositive(PathD poly)
     {
-      return Area(poly, orientation_is_reversed) >= 0;
+      return Area(poly) >= 0;
     }
 
     public static Path64 OffsetPath(Path64 path, long dx, long dy)
@@ -256,7 +244,7 @@ namespace Clipper2Lib
       return result;
     }
 
-    //Unlike ScalePath, both ScalePath64 & ScalePathD also involve type conversion
+    // Unlike ScalePath, both ScalePath64 & ScalePathD also involve type conversion
     public static Path64 ScalePath64(PathD path, double scale)
     {
       int cnt = path.Count;
@@ -293,7 +281,7 @@ namespace Clipper2Lib
       return res;
     }
 
-    //The static functions Path64 and PathD convert path types without scaling
+    // The static functions Path64 and PathD convert path types without scaling
     public static Path64 Path64(PathD path)
     {
       Path64 result = new Path64(path.Count);
@@ -326,7 +314,15 @@ namespace Clipper2Lib
       return result;
     }
 
-    public static Paths64 OffsetPaths(Paths64 paths, long dx, long dy)
+    public static Path64 TranslatePath(Path64 path, long dx, long dy)
+    {
+      Path64 result = new Path64(path.Count);
+      foreach (Point64 pt in path)
+        result.Add(new Point64(pt.X + dx, pt.Y + dy));
+      return result;
+    }
+
+    public static Paths64 TranslatePaths(Paths64 paths, long dx, long dy)
     {
       Paths64 result = new Paths64(paths.Count);
       foreach (Path64 path in paths)
@@ -334,7 +330,7 @@ namespace Clipper2Lib
       return result;
     }
 
-    public static PathD OffsetPath(PathD path, long dx, long dy)
+    public static PathD TranslatePath(PathD path, double dx, double dy)
     {
       PathD result = new PathD(path.Count);
       foreach (PointD pt in path)
@@ -342,11 +338,11 @@ namespace Clipper2Lib
       return result;
     }
 
-    public static PathsD OffsetPaths(PathsD paths, long dx, long dy)
+    public static PathsD TranslatePaths(PathsD paths, double dx, double dy)
     {
       PathsD result = new PathsD(paths.Count);
       foreach (PathD path in paths)
-        result.Add(OffsetPath(path, dx, dy));
+        result.Add(TranslatePath(path, dx, dy));
       return result;
     }
 
@@ -489,19 +485,19 @@ namespace Clipper2Lib
       return result;
     }
 
-    private static void AddPolyNodeToPaths(PolyPath polyPath, Paths64 paths)
+    private static void AddPolyNodeToPaths(PolyPath64 polyPath, Paths64 paths)
     {
       if (polyPath.Polygon!.Count > 0)
         paths.Add(polyPath.Polygon);
       for (int i = 0; i < polyPath.ChildCount; i++)
-        AddPolyNodeToPaths((PolyPath) polyPath._childs[i], paths);
+        AddPolyNodeToPaths((PolyPath64) polyPath._childs[i], paths);
     }
 
-    public static Paths64 PolyTreeToPaths(PolyTree polyTree)
+    public static Paths64 PolyTreeToPaths(PolyTree64 polyTree)
     {
       Paths64 result = new Paths64();
       for (int i = 0; i < polyTree.ChildCount; i++)
-        AddPolyNodeToPaths((PolyPath) polyTree._childs[i], result);
+        AddPolyNodeToPaths((PolyPath64) polyTree._childs[i], result);
       return result;
     }
 
@@ -548,7 +544,7 @@ namespace Clipper2Lib
       while (end > begin && path[begin] == path[end]) flags[end--] = false;
       for (int i = begin + 1; i < end; ++i)
       {
-        //PerpendicDistFromLineSqrd - avoids expensive Sqrt()
+        // PerpendicDistFromLineSqrd - avoids expensive Sqrt()
         double d = PerpendicDistFromLineSqrd(path[i], path[begin], path[end]);
         if (d <= max_d) continue;
         max_d = d;
@@ -589,7 +585,7 @@ namespace Clipper2Lib
       while (end > begin && path[begin] == path[end]) flags[end--] = false;
       for (int i = begin + 1; i < end; ++i)
       {
-        //PerpendicDistFromLineSqrd - avoids expensive Sqrt()
+        // PerpendicDistFromLineSqrd - avoids expensive Sqrt()
         double d = PerpendicDistFromLineSqrd(path[i], path[begin], path[end]);
         if (d <= max_d) continue;
         max_d = d;
@@ -724,11 +720,11 @@ namespace Clipper2Lib
 
         if (pt.X < curr.X && pt.X < prev.X)
         {
-          //we're only interested in edges crossing on the left
+          // we're only interested in edges crossing on the left
         }
         else if (pt.X > prev.X && pt.X > curr.X)
         {
-          val = 1 - val; //toggle val
+          val = 1 - val; // toggle val
         }
         else
         {
@@ -747,4 +743,4 @@ namespace Clipper2Lib
     }
   }
 
-} //namespace
+} // namespace

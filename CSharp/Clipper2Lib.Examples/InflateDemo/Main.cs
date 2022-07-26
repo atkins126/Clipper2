@@ -45,7 +45,7 @@ namespace ClipperDemo1
       //different join types within the same offset operation
       ClipperOffset co = new ClipperOffset();
       co.AddPaths(p, JoinType.Miter, EndType.Joined);
-      p = Clipper.OffsetPaths(p, 120, 100);
+      p = Clipper.TranslatePaths(p, 120, 100);
       pp.AddRange(p);
       co.AddPaths(p, JoinType.Round, EndType.Joined);
       p = co.Execute(20);
@@ -70,8 +70,8 @@ namespace ClipperDemo1
       {
         //don't forget to scale the delta offset
         p = Clipper.InflatePaths(p, -2.5 * scale, JoinType.Round, EndType.Polygon);
-        //RamerDouglasPeucker - not essential but
-        //speeds up the loop and also tidies up the result
+        //RamerDouglasPeucker - not essential but not only 
+        //speeds up the loop but also tidies the result
         p = Clipper.RamerDouglasPeucker(p, 0.025 * scale);
         pp.AddRange(p);
       }

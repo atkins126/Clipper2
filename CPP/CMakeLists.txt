@@ -31,7 +31,7 @@ add_library(Clipper2utils SHARED
   Utils/ClipFileLoad.cpp
   Utils/ClipFileSave.cpp
 )
-target_link_libraries(Clipper2utils PRIVATE -lm)
+target_link_libraries(Clipper2utils PRIVATE -lm Clipper2)
 set_target_properties(Clipper2utils PROPERTIES LINKER_LANGUAGE CXX)
 set_target_properties(Clipper2utils PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_SOURCE_DIR}/lib")
 
@@ -84,6 +84,7 @@ if(PACKAGE_TESTS)
   package_add_test(test7 Tests/Tests/TestTrimCollinear.cpp )
   package_add_test(test8 Tests/Tests/TestOrientation.cpp )
   package_add_test(test9 Tests/Tests/TestHoleOwnership2.cpp )
+  package_add_test(test10 Tests/Tests/TestRandomPolygons.cpp )
 
   install( FILES  ../Tests/PolytreeHoleOwner.txt DESTINATION . )
   install( FILES  ../Tests/PolytreeHoleOwner2.txt DESTINATION . )

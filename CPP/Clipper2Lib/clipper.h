@@ -1,7 +1,7 @@
 /*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  Clipper2 - beta                                                 *
-* Date      :  12 July 2022                                                    *
+* Date      :  23 July 2022                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  This module provides a simple interface to the Clipper Library  *
@@ -45,11 +45,23 @@ namespace Clipper2Lib
     return result;
   }
 
-  inline PathsD BooleanOp(ClipType cliptype, FillRule fillrule,
-    const PathsD& subjects, const PathsD& clips)
+  inline void BooleanOp(ClipType cliptype, FillRule fillrule,
+    const Paths64& subjects, const Paths64& clips, PolyTree64& solution)
   {
+    Paths64 sol_open;
+    Clipper64 clipper;
+    clipper.AddSubject(subjects);
+    clipper.AddClip(clips);
+    clipper.Execute(cliptype, fillrule, solution, sol_open);
+  }
+
+  inline PathsD BooleanOp(ClipType cliptype, FillRule fillrule,
+    const PathsD& subjects, const PathsD& clips, int decimal_prec = 2)
+  {
+    if (decimal_prec > 8 || decimal_prec < -8)
+      throw Clipper2Exception("invalid decimal precision");
     PathsD result;
-    ClipperD clipper;
+    ClipperD clipper(decimal_prec);
     clipper.AddSubject(subjects);
     clipper.AddClip(clips);
     clipper.Execute(cliptype, fillrule, result);
@@ -61,9 +73,9 @@ namespace Clipper2Lib
     return BooleanOp(ClipType::Intersection, fillrule, subjects, clips);
   }
   
-  inline PathsD Intersect(const PathsD& subjects, const PathsD& clips, FillRule fillrule)
+  inline PathsD Intersect(const PathsD& subjects, const PathsD& clips, FillRule fillrule, int decimal_prec = 2)
   {
-    return BooleanOp(ClipType::Intersection, fillrule, subjects, clips);
+    return BooleanOp(ClipType::Intersection, fillrule, subjects, clips, decimal_prec);
   }
 
   inline Paths64 Union(const Paths64& subjects, const Paths64& clips, FillRule fillrule)
@@ -71,9 +83,9 @@ namespace Clipper2Lib
     return BooleanOp(ClipType::Union, fillrule, subjects, clips);
   }
 
-  inline PathsD Union(const PathsD& subjects, const PathsD& clips, FillRule fillrule)
+  inline PathsD Union(const PathsD& subjects, const PathsD& clips, FillRule fillrule, int decimal_prec = 2)
   {
-    return BooleanOp(ClipType::Union, fillrule, subjects, clips);
+    return BooleanOp(ClipType::Union, fillrule, subjects, clips, decimal_prec);
   }
 
   inline Paths64 Union(const Paths64& subjects, FillRule fillrule)
@@ -85,10 +97,12 @@ namespace Clipper2Lib
     return result;
   }
 
-  inline PathsD Union(const PathsD& subjects, FillRule fillrule)
+  inline PathsD Union(const PathsD& subjects, FillRule fillrule, int decimal_prec = 2)
   {
+    if (decimal_prec > 8 || decimal_prec < -8)
+      throw Clipper2Exception("invalid decimal precision");
     PathsD result;
-    ClipperD clipper;
+    ClipperD clipper(decimal_prec);
     clipper.AddSubject(subjects);
     clipper.Execute(ClipType::Union, fillrule, result);
     return result;
@@ -99,9 +113,9 @@ namespace Clipper2Lib
     return BooleanOp(ClipType::Difference, fillrule, subjects, clips);
   }
 
-  inline PathsD Difference(const PathsD& subjects, const PathsD& clips, FillRule fillrule)
+  inline PathsD Difference(const PathsD& subjects, const PathsD& clips, FillRule fillrule, int decimal_prec = 2)
   {
-    return BooleanOp(ClipType::Difference, fillrule, subjects, clips);
+    return BooleanOp(ClipType::Difference, fillrule, subjects, clips, decimal_prec);
   }
 
   inline Paths64 Xor(const Paths64& subjects, const Paths64& clips, FillRule fillrule)
@@ -109,9 +123,9 @@ namespace Clipper2Lib
     return BooleanOp(ClipType::Xor, fillrule, subjects, clips);
   }
 
-  inline PathsD Xor(const PathsD& subjects, const PathsD& clips, FillRule fillrule)
+  inline PathsD Xor(const PathsD& subjects, const PathsD& clips, FillRule fillrule, int decimal_prec = 2)
   {
-    return BooleanOp(ClipType::Xor, fillrule, subjects, clips);
+    return BooleanOp(ClipType::Xor, fillrule, subjects, clips, decimal_prec);
   }
 
   inline bool IsFullOpenEndType(EndType et)
@@ -139,7 +153,7 @@ namespace Clipper2Lib
     return ScalePaths<double, int64_t>(tmp, 1 / scale);
   }
 
-  inline Path64 OffsetPath(const Path64& path, int64_t dx, int64_t dy)
+  inline Path64 TranslatePath(const Path64& path, int64_t dx, int64_t dy)
   {
     Path64 result;
     result.reserve(path.size());
@@ -148,7 +162,7 @@ namespace Clipper2Lib
     return result;
   }
 
-  inline PathD OffsetPath(const PathD& path, double dx, double dy)
+  inline PathD TranslatePath(const PathD& path, double dx, double dy)
   {
     PathD result;
     result.reserve(path.size());
@@ -157,21 +171,21 @@ namespace Clipper2Lib
     return result;
   }
 
-  inline Paths64 OffsetPaths(const Paths64& paths, int64_t dx, int64_t dy)
+  inline Paths64 TranslatePaths(const Paths64& paths, int64_t dx, int64_t dy)
   {
     Paths64 result;
     result.reserve(paths.size());
     for (const Path64& path : paths)
-      result.push_back(OffsetPath(path, dx, dy));
+      result.push_back(TranslatePath(path, dx, dy));
     return result;
   }
 
-  inline PathsD OffsetPaths(const PathsD& paths, double dx, double dy)
+  inline PathsD TranslatePaths(const PathsD& paths, double dx, double dy)
   {
     PathsD result;
     result.reserve(paths.size());
     for (const PathD& path : paths)
-      result.push_back(OffsetPath(path, dx, dy));
+      result.push_back(TranslatePath(path, dx, dy));
     return result;
   }
 
@@ -233,19 +247,96 @@ namespace Clipper2Lib
     return rec;
   }
 
-  namespace details 
+  template <typename T>
+  inline PointInPolygonResult PointInPolygon(const Point<T>& pt, const Path<T>& polygon)
+  {
+    if (polygon.size() < 3)
+      return PointInPolygonResult::IsOutside;
+
+    int val = 0;
+    typename Path<T>::const_iterator start = polygon.cbegin(), cit = start;
+    typename Path<T>::const_iterator cend = polygon.cend(), pit = cend - 1;
+
+    while (pit->y == pt.y)
+    {
+      if (pit == start) return PointInPolygonResult::IsOutside;
+      --pit;
+    }
+    bool is_above = pit->y < pt.y;
+
+    while (cit != cend)
+    {
+      if (is_above)
+      {
+        while (cit != cend && cit->y < pt.y) ++cit;
+        if (cit == cend) break;
+      }
+      else
+      {
+        while (cit != cend && cit->y > pt.y) ++cit;
+        if (cit == cend) break;
+      }
+
+      if (cit == start) pit = cend - 1;
+      else  pit = cit - 1;
+
+      if (cit->y == pt.y)
+      {
+        if (cit->x == pt.x || (cit->y == pit->y &&
+          ((pt.x < pit->x) != (pt.x < cit->x))))
+          return PointInPolygonResult::IsOn;
+        ++cit;
+        continue;
+      }
+
+      if (pt.x < cit->x && pt.x < pit->x)
+      {
+        // we're only interested in edges crossing on the left
+      }
+      else if (pt.x > pit->x && pt.x > cit->x)
+        val = 1 - val; // toggle val
+      else
+      {
+        double d = CrossProduct(*pit, *cit, pt);
+        if (d == 0)
+          return PointInPolygonResult::IsOn;
+        else if ((d < 0) == is_above)
+          val = 1 - val;
+      }
+      is_above = !is_above;
+      cit++;
+    }
+    if (val == 0)
+      return PointInPolygonResult::IsOutside;
+    else
+      return PointInPolygonResult::IsInside;
+  }
+
+  namespace details
   {
 
     template <typename T>
-    inline void AddPolyNodeToPaths(const PolyPath<T>& polytree, Paths<T>& paths)
+    inline void InternalPolyNodeToPaths(const PolyPath<T>& polypath, Paths<T>& paths)
     {
-      if (!polytree.polygon().empty())
-        paths.push_back(polytree.polygon());
-      for (PolyPath<T>* child : polytree.childs())
-        AddPolyNodeToPaths(*child, paths);
+      paths.push_back(polypath.polygon());
+      for (PolyPath<T>* child : polypath.childs())
+        InternalPolyNodeToPaths(*child, paths);
     }
 
-    inline bool GetInt(std::string::const_iterator& iter, const 
+    inline bool InternalPolyPathContainsChildren(const PolyPath64& pp)
+    {
+      for (auto child : pp.childs())
+      {
+        for (const Point64& pt : child->polygon())
+          if (PointInPolygon(pt, pp.polygon()) == PointInPolygonResult::IsOutside)
+            return false;
+        if (child->ChildCount() > 0 && !InternalPolyPathContainsChildren(*child))
+          return false;
+      }
+      return true;
+    }
+
+    inline bool GetInt(std::string::const_iterator& iter, const
       std::string::const_iterator& end_iter, int64_t& val)
     {
       val = 0;
@@ -304,7 +395,7 @@ namespace Clipper2Lib
         if (*iter == ' ') ++iter;
         else if (*iter == ',')
         {
-          if (comma_seen) return; //don't skip 2 commas!
+          if (comma_seen) return; // don't skip 2 commas!
           comma_seen = true;
           ++iter;
         }
@@ -316,13 +407,13 @@ namespace Clipper2Lib
     {
       while (*chrs > 0 && c != *chrs) ++chrs;
       if (!*chrs) return false;
-      *chrs = ' '; //only match once per char
+      *chrs = ' '; // only match once per char
       return true;
     }
 
 
     inline void SkipUserDefinedChars(std::string::const_iterator& iter,
-      const std::string::const_iterator& end_iter, const std::string skip_chars)
+      const std::string::const_iterator& end_iter, const std::string& skip_chars)
     {
       const size_t MAX_CHARS = 16;
       char buff[MAX_CHARS] = {0};
@@ -332,14 +423,23 @@ namespace Clipper2Lib
       return;
     }
 
-  } //end details namespace 
+  } // end details namespace 
 
   template <typename T>
   inline Paths<T> PolyTreeToPaths(const PolyTree<T>& polytree)
   {
     Paths<T> result;
-    details::AddPolyNodeToPaths(polytree, result);
+    for (const auto* child : polytree.childs())
+      details::InternalPolyNodeToPaths(*child, result);
     return result;
+  }
+
+  inline bool CheckPolytreeFullyContainsChildren(const PolyTree64& polytree)
+  {
+    for (const PolyPath64* child : polytree.childs())
+      if (child->ChildCount() > 0 && !details::InternalPolyPathContainsChildren(*child))
+        return false;
+    return true;
   }
 
   inline Path64 MakePath(const std::string& s, const std::string& skip_chars = "")
@@ -441,71 +541,6 @@ namespace Clipper2Lib
   }
 
   template <typename T>
-  inline PointInPolygonResult PointInPolygon(const Point<T>& pt, const Path<T>& polygon)
-  {
-    if (polygon.size() < 3) 
-      return PointInPolygonResult::IsOutside;
-
-    int val = 0;
-    typename Path<T>::const_iterator start = polygon.cbegin(), cit = start;
-    typename Path<T>::const_iterator cend = polygon.cend(), pit = cend -1;
-
-    while (pit->y == pt.y)
-    {
-      if (pit == start) return PointInPolygonResult::IsOutside;
-      --pit;
-    }
-    bool is_above = pit->y < pt.y;
-
-    while (cit != cend)
-    {
-      if (is_above)
-      {
-        while (cit != cend && cit->y < pt.y) ++cit;
-        if (cit == cend) break;
-      }
-      else
-      {
-        while (cit != cend && cit->y > pt.y) ++cit;
-        if (cit == cend) break;
-      }
-
-      if (cit == start) pit = cend - 1;
-      else  pit = cit - 1;
-
-      if (cit->y == pt.y)
-      {
-        if (cit->x == pt.x || (cit->y == pit->y &&
-          ((pt.x < pit->x) != (pt.x < pit->x))))
-          return PointInPolygonResult::IsOn;
-        cit++;
-        continue;
-      }
-      
-      if (pt.x < cit->x && pt.x < pit->x)
-      {
-        //we're only interested in edges crossing on the left
-      }
-      else if (pt.x > pit->x && pt.x > cit->x)
-        val = 1 - val; //toggle val
-      else
-      {
-        double d = CrossProduct(*pit, *cit, pt);
-        if (d == 0)
-          return PointInPolygonResult::IsOn;
-        else if ((d < 0) == is_above) 
-          val  = 1 - val;
-      }      
-      is_above = !is_above;
-      cit++;
-    }
-    if (val == 0)
-      return PointInPolygonResult::IsOutside;
-    else
-      return PointInPolygonResult::IsInside;
-  }
-
-  template <typename T>
   inline double Distance(const Point<T> pt1, const Point<T> pt2)
   {
     return std::sqrt(DistanceSqr(pt1, pt2));
@@ -533,30 +568,23 @@ namespace Clipper2Lib
   }
   
   template <typename T>
-  inline Path<T> Ellipse(const Rect<T>& rect, int steps = 0,
-    bool orientation_is_reversed = DEFAULT_ORIENTATION_IS_REVERSED)
+  inline Path<T> Ellipse(const Rect<T>& rect, int steps = 0)
   {
-    return Ellipse(rect.MidPoint(), rect.Width() / 2, rect.Height() / 2,
-      steps, orientation_is_reversed);
+    return Ellipse(rect.MidPoint(), 
+      static_cast<double>(rect.Width()) *0.5, 
+      static_cast<double>(rect.Height()) * 0.5, steps);
   }
 
   template <typename T>
   inline Path<T> Ellipse(const Point<T>& center,
-    double radiusX, double radiusY = 0, int steps = 0,
-    bool orientation_is_reversed = DEFAULT_ORIENTATION_IS_REVERSED)
+    double radiusX, double radiusY = 0, int steps = 0)
   {
     if (radiusX <= 0) return Path<T>();
     if (radiusY <= 0) radiusY = radiusX;
     if (steps <= 2)
       steps = static_cast<int>(PI * sqrt((radiusX + radiusY) / 2));
 
-    //to ensure function returns a positive area
-    double si;
-    if (orientation_is_reversed)
-      si = -std::sin(2 * PI / steps);
-    else
-      si = std::sin(2 * PI / steps);
-
+    double si = std::sin(2 * PI / steps);
     double co = std::cos(2 * PI / steps);
     double dx = co, dy = si;
     Path<T> result;
@@ -593,7 +621,7 @@ namespace Clipper2Lib
     while (end > begin && path[begin] == path[end]) flags[end--] = false;
     for (typename Path<T>::size_type i = begin + 1; i < end; ++i)
     {
-      //PerpendicDistFromLineSqrd - avoids expensive Sqrt()
+      // PerpendicDistFromLineSqrd - avoids expensive Sqrt()
       double d = PerpendicDistFromLineSqrd(path[i], path[begin], path[end]);
       if (d <= max_d) continue;
       max_d = d;
@@ -632,6 +660,6 @@ namespace Clipper2Lib
     return result;
   }
 
-}  //end Clipper2Lib namespace
+}  // end Clipper2Lib namespace
 
 #endif  // CLIPPER_H

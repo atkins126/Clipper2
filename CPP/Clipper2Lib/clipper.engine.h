@@ -1,7 +1,7 @@
 /*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  Clipper2 - beta                                                 *
-* Date      :  9 July 2022                                                     *
+* Date      :  14 July 2022                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  This is the main polygon clipping module                        *
@@ -75,8 +75,6 @@ namespace Clipper2Lib {
 		}
 	};
 
-	enum class OutRecState { Undefined = 0, Open = 1, Outer = 2, Inner = 4};
-
 	template <typename T>
 	class PolyPath;
 
@@ -101,7 +99,7 @@ namespace Clipper2Lib {
 		Active* back_edge = nullptr;
 		OutPt* pts = nullptr;
 		PolyPath64* polypath = nullptr;
-		OutRecState state = OutRecState::Undefined;
+		bool is_open = false;
 		~OutRec() { if (splits) delete splits; };
 	};
 
@@ -132,7 +130,7 @@ namespace Clipper2Lib {
 		Active* next_in_sel = nullptr;
 		Active* jump = nullptr;
 		Vertex* vertex_top = nullptr;
-		LocalMinima* local_min = nullptr;  //the bottom of an edge 'bound' (also Vatti)
+		LocalMinima* local_min = nullptr;  // the bottom of an edge 'bound' (also Vatti)
 		bool is_left_bound = false;
 	};
 
@@ -193,7 +191,7 @@ namespace Clipper2Lib {
 		inline bool IsContributingOpen(const Active &e) const;
 		void SetWindCountForClosedPathEdge(Active &edge);
 		void SetWindCountForOpenPathEdge(Active &e);
-		virtual void InsertLocalMinimaIntoAEL(int64_t bot_y);
+		void InsertLocalMinimaIntoAEL(int64_t bot_y);
 		void InsertLeftEdge(Active &e);
 		inline void PushHorz(Active &e);
 		inline bool PopHorz(Active *&e);
@@ -223,7 +221,7 @@ namespace Clipper2Lib {
 		Active *DoMaxima(Active &e);
 		void JoinOutrecPaths(Active &e1, Active &e2);
 		void CompleteSplit(OutPt* op1, OutPt* op2, OutRec& outrec);
-		bool ValidateClosedPathEx(OutRec* outrec);
+		bool ValidateClosedPathEx(OutPt*& outrec);
 		void CleanCollinear(OutRec* outrec);
 		void FixSelfIntersects(OutRec* outrec);
 		OutPt* DoSplitOp(OutPt* outRecOp, OutPt* splitOp);
@@ -238,16 +236,15 @@ namespace Clipper2Lib {
 		void DeleteJoin(Joiner* joiner);
 		void ProcessJoinerList();
 		OutRec* ProcessJoin(Joiner* joiner);
-		virtual bool ExecuteInternal(ClipType ct, FillRule ft, bool use_polytrees);
+		bool ExecuteInternal(ClipType ct, FillRule ft, bool use_polytrees);
 		void BuildPaths(Paths64& solutionClosed, Paths64* solutionOpen);
 		void BuildTree(PolyPath64& polytree, Paths64& open_paths);
 #ifdef USINGZ
-		ZFillCallback zfill_func_; //custom callback 
+		ZFillCallback zfill_func_ = nullptr; // custom callback 
 		void SetZ(const Active& e1, const Active& e2, Point64& pt);
 #endif
 	protected:
-		bool orientation_is_reversed_ = true;
-		void CleanUp();  //unlike Clear, CleanUp preserves added paths
+		void CleanUp();  // unlike Clear, CleanUp preserves added paths
 		void AddPath(const Path64& path, PathType polytype, bool is_open);
 		void AddPaths(const Paths64& paths, PathType polytype, bool is_open);
 
@@ -260,20 +257,6 @@ namespace Clipper2Lib {
 	public:
 #ifdef USINGZ
 		void ZFillFunction(ZFillCallback zFillFunc) { zfill_func_ = zFillFunc; }
-		ClipperBase(bool use_reverse_orientation = DEFAULT_ORIENTATION_REVERSED)
-		{ 
-			ReverseSolution = use_reverse_orientation;
-			if (use_reverse_orientation)
-				fillpos = FillRule::Negative;
-			zfill_func_ = nullptr;
-		};
-#else
-		explicit ClipperBase(bool orientation_is_reversed = DEFAULT_ORIENTATION_IS_REVERSED)
-		{
-			orientation_is_reversed_ = orientation_is_reversed;
-			if (orientation_is_reversed_)
-				fillpos = FillRule::Negative;
-		}
 #endif
 		virtual ~ClipperBase();
 		bool PreserveCollinear = true;
@@ -289,7 +272,7 @@ namespace Clipper2Lib {
 	//paths that contain (or own) other paths. This will be useful to some users.
 
 	template <typename T>
-	class PolyPath {
+	class PolyPath final {
 	private:
 		double scale_;
 		Path<T> polygon_;
@@ -301,13 +284,13 @@ namespace Clipper2Lib {
 			scale_(parent->scale_), polygon_(path), parent_(parent){}
 	public:
 
-		explicit PolyPath(int precision = 0) //NB only for root node
+		explicit PolyPath(int precision = 0) // NB only for root node
 		{  
 			scale_ = std::pow(10, precision);
 			parent_ = nullptr;
 		}
 
-		virtual ~PolyPath() { Clear(); };
+		~PolyPath() { Clear(); };
 		
 		//https://en.cppreference.com/w/cpp/language/rule_of_three
 		PolyPath(const PolyPath&) = delete;
@@ -363,6 +346,7 @@ namespace Clipper2Lib {
 
 	void Polytree64ToPolytreeD(const PolyPath64& polytree, PolyPathD& result);
 
+
 	class Clipper64 : public ClipperBase
 	{
 	public:
@@ -403,11 +387,12 @@ namespace Clipper2Lib {
 
 	class ClipperD : public ClipperBase {
 	private:
-		const double scale_;
+		double scale_ = 1.0;
 	public:
-		explicit ClipperD(int precision = 0,
-      bool use_reverse_orientation = DEFAULT_ORIENTATION_IS_REVERSED) : 
-      ClipperBase(use_reverse_orientation), scale_(std::pow(10, precision)) {}
+		explicit ClipperD(int precision = 0) : ClipperBase() 
+		{
+			scale_ = std::pow(10, precision);
+		}
 
 		void AddSubject(const PathsD& subjects)
 		{
@@ -455,8 +440,6 @@ namespace Clipper2Lib {
 
 	};
 
-	using Clipper = Clipper64;
-
 }  // namespace 
 
-#endif  //clipper_engine_h
+#endif  // clipper_engine_h

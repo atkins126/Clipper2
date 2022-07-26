@@ -36,14 +36,14 @@ int main(int argc, char* argv[])
   //different join types within the same offset operation
   ClipperOffset co;
   co.AddPaths(p, JoinType::Miter, EndType::Joined);
-  p = OffsetPaths(p, 120, 100);
+  p = TranslatePaths(p, 120, 100);
   pp.insert(pp.end(), p.begin(), p.end());
   co.AddPaths(p, JoinType::Round, EndType::Joined);
   p = co.Execute(20);
   pp.insert(pp.end(), p.begin(), p.end());
 
-  SvgWriter svg(fr);
-  SvgAddSolution(svg, Paths64ToPathsD(pp), false);
+  SvgWriter svg;
+  SvgAddSolution(svg, Paths64ToPathsD(pp), fr, false);
   SvgSaveToFile(svg, "solution_off.svg", 800, 600, 20);
   System("solution_off.svg");
 
@@ -72,7 +72,7 @@ int main(int argc, char* argv[])
   }
 
   svg.Clear();
-  SvgAddSolution(svg, ScalePaths<double, int64_t>(pp, 1/scale), false);   //scale back down
+  SvgAddSolution(svg, ScalePaths<double, int64_t>(pp, 1/scale), fr, false);   //scale back down
   SvgSaveToFile(svg, "solution_off2.svg", 450, 720, 0);
   System("solution_off2.svg");
 
