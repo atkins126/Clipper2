@@ -2,8 +2,8 @@ unit Clipper.Engine;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  Clipper2 - beta                                                 *
-* Date      :  27 July 2022                                                    *
+* Version   :  Clipper2 - ver.1.0.0                                            *
+* Date      :  10 August 2022                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  This is the main polygon clipping module                        *
@@ -279,9 +279,9 @@ type
     FParent     : TPolyPathBase;
     FChildList  : TList;
     function    GetChildCnt: Integer;
-    function    GetChild(index: Integer): TPolyPathBase;
     function    GetIsHole: Boolean;
   protected
+    function    GetChild(index: Integer): TPolyPathBase;
     function    AddChild(const path: TPath64): TPolyPathBase; virtual; abstract;
     property    ChildList: TList read FChildList;
     property    Parent: TPolyPathBase read FParent write FParent;
@@ -290,16 +290,18 @@ type
     destructor  Destroy; override;
     procedure   Clear; virtual;
     property    IsHole: Boolean read GetIsHole;
-    property    ChildCount: Integer read GetChildCnt;
-    property    Child[index: Integer]: TPolyPathBase read GetChild;
+    property    Count: Integer read GetChildCnt;
+    property    Child[index: Integer]: TPolyPathBase read GetChild; default;
   end;
 
   TPolyPath64 = class(TPolyPathBase)
   {$IFDEF STRICT}strict{$ENDIF} private
     FPath : TPath64;
+    function    GetChild64(index: Integer): TPolyPath64;
   protected
     function AddChild(const path: TPath64): TPolyPathBase; override;
   public
+    property Child[index: Integer]: TPolyPath64 read GetChild64; default;
     property Polygon: TPath64 read FPath;
   end;
 
@@ -347,11 +349,13 @@ type
   TPolyPathD = class(TPolyPathBase)
   {$IFDEF STRICT}strict{$ENDIF} private
     FPath   : TPathD;
+    function  GetChildD(index: Integer): TPolyPathD;
   protected
     FScale  : double;
     function  AddChild(const path: TPath64): TPolyPathBase; override;
   public
     property  Polygon: TPathD read FPath;
+    property Child[index: Integer]: TPolyPathD read GetChildD; default;
   end;
 
   TPolyTreeD = class(TPolyPathD)
@@ -1978,7 +1982,7 @@ begin
   op2 := op;
   while true do
   begin
-    // 3 edged polygons can't self-intersect
+    // triangles can't self-intersect
     if (op2.prev = op2.next.next) then
       Break
     else if SegmentsIntersect(op2.prev.pt, op2.pt,
@@ -2494,18 +2498,26 @@ begin
         op1.prev := op2;
         op2.next := op1;
 
-        SafeDeleteOutPtJoiners(op2);
-        DisposeOutPt(op2);
+//        SafeDeleteOutPtJoiners(op2);
+//        DisposeOutPt(op2);
 
         if (or1.idx < or2.idx) then
         begin
           or1.pts := op1;
           or2.pts := nil;
+          if Assigned(or1.owner) and
+            (not Assigned(or2.owner) or
+							(or2.owner.idx < or1.owner.idx)) then
+								or1.owner := or2.owner;
           or2.owner := or1
         end else
         begin
           or2.pts := op1;
           or1.pts := nil;
+          if Assigned(or2.owner) and
+            (not Assigned(or1.owner) or
+							(or1.owner.idx < or2.owner.idx)) then
+								or2.owner := or1.owner;
           or1.owner := or2;
         end;
       end;
@@ -2546,19 +2558,27 @@ begin
         op1.next := op2;
         op2.prev := op1;
 
-        SafeDeleteOutPtJoiners(op2);
-        DisposeOutPt(op2);
+//        SafeDeleteOutPtJoiners(op2);
+//        DisposeOutPt(op2);
 
         if or1.idx < or2.idx then
         begin
           or1.pts := op1;
           or2.pts := nil;
+          if Assigned(or1.owner) and
+            (not Assigned(or2.owner) or
+							(or2.owner.idx < or1.owner.idx)) then
+								or1.owner := or2.owner;
           or2.owner := or1;
         end else
         begin
           Result := or2;
           or2.pts := op1;
           or1.pts := nil;
+          if Assigned(or2.owner) and
+            (not Assigned(or1.owner) or
+							(or1.owner.idx < or2.owner.idx)) then
+								or2.owner := or1.owner;
           or1.owner := or2;
         end;
       end;
@@ -3844,19 +3864,23 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetBounds(op: POutPt): TRect64;
+function GetBounds(const path: TPath64): TRect64;
 var
-  op2: POutPt;
+  i: integer;
 begin
-  result := Rect64(op.pt.x, op.pt.y, op.pt.x, op.pt.y);
-  op2 := op.next;
-  while (op2 <> op) do
+  if Length(path) = 0 then
   begin
-    if (op2.pt.x < result.left) then result.left := op2.pt.X
-    else if (op2.pt.x > result.right) then result.right := op2.pt.X;
-    if (op2.pt.y < result.top) then result.top := op2.pt.Y
-    else if (op2.pt.y > result.bottom) then result.bottom := op2.pt.Y;
-    op2 := op2.next;
+    Result := NullRect64;
+    Exit;
+  end;
+
+  result := Rect64(MaxInt64, MaxInt64, -MaxInt64, -MaxInt64);
+  for i := 0 to High(path) do
+  begin
+    if (path[i].X < result.left) then result.left := path[i].X;
+    if (path[i].X > result.right) then result.right := path[i].X;
+    if (path[i].Y < result.top) then result.top := path[i].Y;
+    if (path[i].Y > result.bottom) then result.bottom := path[i].Y;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -3868,7 +3892,7 @@ var
   isInsideOwnerBounds: Boolean;
 begin
   if (owner.bounds.IsEmpty) then
-    owner.bounds := Clipper.Engine.GetBounds(owner.pts);
+    owner.bounds := Clipper.Engine.GetBounds(owner.path);
   isInsideOwnerBounds := owner.bounds.Contains(outrec.bounds);
 
   // while looking for the correct owner, check the owner's
@@ -3889,11 +3913,10 @@ begin
       Exit;
     end;
 
-    if split.bounds.IsEmpty then
-      split.bounds := Clipper.Engine.GetBounds(split.pts);
     if Length(split.path) = 0 then
       BuildPath(split.pts, FReverseSolution, false, split.path);
-
+    if split.bounds.IsEmpty then
+      split.bounds := Clipper.Engine.GetBounds(split.path);
     if split.bounds.Contains(OutRec.bounds) and
       Path1InsidePath2(OutRec, split) then
     begin
@@ -3953,9 +3976,8 @@ begin
 
       if not BuildPath(outRec.pts, FReverseSolution, false, outRec.path) then
         Continue;
-
       if outrec.bounds.IsEmpty then
-        outrec.bounds := Clipper.Engine.GetBounds(outrec.pts);
+        outrec.bounds := Clipper.Engine.GetBounds(outrec.path);
       outrec.owner := GetRealOutRec(outrec.owner);
       if assigned(outRec.owner) then
         DeepCheckOwner(outRec, outRec.owner);
@@ -3974,7 +3996,7 @@ begin
         outRec.owner := GetRealOutRec(outRec.owner);
         BuildPath(outRec.pts, FReverseSolution, false, outRec.path);
         if (outRec.bounds.IsEmpty) then
-          outRec.bounds := Clipper.Engine.GetBounds(outRec.pts);
+          outRec.bounds := Clipper.Engine.GetBounds(outRec.path);
         if Assigned(outRec.owner) then
           DeepCheckOwner(outRec, outRec.owner);
       end;
@@ -4177,6 +4199,12 @@ begin
   Result.Parent := self;
   TPolyPath64(Result).FPath := path;;
   ChildList.Add(Result);
+end;
+//------------------------------------------------------------------------------
+
+function TPolyPath64.GetChild64(index: Integer): TPolyPath64;
+begin
+  Result := TPolyPath64(GetChild(index));
 end;
 
 //------------------------------------------------------------------------------
@@ -4402,6 +4430,12 @@ begin
   TPolyPathD(Result).fScale := fScale;
   TPolyPathD(Result).FPath := ScalePathD(path, 1/FScale);
   ChildList.Add(Result);
+end;
+//------------------------------------------------------------------------------
+
+function TPolyPathD.GetChildD(index: Integer): TPolyPathD;
+begin
+  Result := TPolyPathD(GetChild(index));
 end;
 
 //------------------------------------------------------------------------------

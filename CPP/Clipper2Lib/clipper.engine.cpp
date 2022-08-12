@@ -1,7 +1,7 @@
 /*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  Clipper2 - beta                                                 *
-* Date      :  27 July 2022                                                    *
+* Version   :  Clipper2 - ver.1.0.0                                            *
+* Date      :  10 August 2022                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  This is the main polygon clipping module                        *
@@ -507,10 +507,10 @@ namespace Clipper2Lib {
 	}
 
 
-	inline OutRec* GetRealOutRec(OutRec* outRec)
+	inline OutRec* GetRealOutRec(OutRec* outrec)
 	{
-		while (outRec && !outRec->pts) outRec = outRec->owner;
-		return outRec;
+		while (outrec && !outrec->pts) outrec = outrec->owner;
+		return outrec;
 	}
 
 
@@ -656,7 +656,7 @@ namespace Clipper2Lib {
 
 			v->prev = nullptr;
 			int cnt = 0;
-			for (const Point64 pt : path)
+			for (const Point64& pt : path)
 			{
 				if (prev_v)
 				{
@@ -1572,7 +1572,7 @@ namespace Clipper2Lib {
 		OutPt* op2 = outrec->pts;
 		for (; ; )
 		{
-			//3 edged polygons can't self-intersect
+			// triangles can't self-intersect
 			if (op2->prev == op2->next->next) break;
 			if (SegmentsIntersect(op2->prev->pt,
 				op2->pt, op2->next->pt, op2->next->next->pt))
@@ -2086,6 +2086,16 @@ namespace Clipper2Lib {
 		return succeeded_;
 	}
 
+
+	bool ClipperBase::Execute(ClipType clip_type, FillRule fill_rule, PolyTree64& polytree)
+	{
+		Paths64 dummy;
+		polytree.Clear();
+		if (ExecuteInternal(clip_type, fill_rule, true))
+			BuildTree(polytree, dummy);
+		CleanUp();
+		return succeeded_;
+	}
 
 	bool ClipperBase::Execute(ClipType clip_type,
 		FillRule fill_rule, PolyTree64& polytree, Paths64& solution_open)
@@ -3145,13 +3155,16 @@ namespace Clipper2Lib {
 					op1->prev = op2;
 					op2->next = op1;
 
-					SafeDeleteOutPtJoiners(op2);
-					DisposeOutPt(op2);
+					//SafeDeleteOutPtJoiners(op2);
+					//DisposeOutPt(op2);
 
 					if (or1->idx < or2->idx)
 					{
 						or1->pts = op1;
 						or2->pts = nullptr;
+						if (or1->owner && (!or2->owner || 
+							or2->owner->idx < or1->owner->idx))
+								or1->owner = or2->owner;
 						or2->owner = or1;
 					}
 					else
@@ -3159,6 +3172,9 @@ namespace Clipper2Lib {
 						result = or2;
 						or2->pts = op1;
 						or1->pts = nullptr;
+						if (or2->owner && (!or1->owner || 
+							or1->owner->idx < or2->owner->idx))
+								or2->owner = or1->owner;
 						or1->owner = or2;
 					}
 				}
@@ -3200,13 +3216,16 @@ namespace Clipper2Lib {
 					op1->next = op2;
 					op2->prev = op1;
 
-					SafeDeleteOutPtJoiners(op2);
-					DisposeOutPt(op2);
+					//SafeDeleteOutPtJoiners(op2);
+					//DisposeOutPt(op2);
 
 					if (or1->idx < or2->idx)
 					{
 						or1->pts = op1;
 						or2->pts = nullptr;
+						if (or1->owner && (!or2->owner || 
+							or2->owner->idx < or1->owner->idx))
+								or1->owner = or2->owner;
 						or2->owner = or1;
 					}
 					else
@@ -3214,6 +3233,9 @@ namespace Clipper2Lib {
 						result = or2;
 						or2->pts = op1;
 						or1->pts = nullptr;
+						if (or2->owner && (!or1->owner || 
+							or1->owner->idx < or2->owner->idx))
+								or2->owner = or1->owner; 
 						or1->owner = or2;
 					}
 				}
@@ -3362,9 +3384,9 @@ namespace Clipper2Lib {
 		for(const Point64& pt : path)
 		{
 			if (pt.x < result.left) result.left = pt.x;
-			else if (pt.x > result.right) result.right = pt.x;
+			if (pt.x > result.right) result.right = pt.x;
 			if (pt.y < result.top) result.top = pt.y;
-			else if (pt.y > result.bottom) result.bottom = pt.y;
+			if (pt.y > result.bottom) result.bottom = pt.y;
 		}
 		return result;
 	}	
@@ -3379,24 +3401,27 @@ namespace Clipper2Lib {
 		// splits **before** checking the owner itself because 
 		// splits can occur internally, and checking the owner 
 		// first would miss the inner split's true ownership
-		if (owner->splits) 
+		if (owner->splits)
+		{
 			for (OutRec* split : *owner->splits)
 			{
 				split = GetRealOutRec(split);
 				if (!split || split->idx <= owner->idx || split == outrec) continue;
+
 				if (split->splits && DeepCheckOwner(outrec, split)) return true;
 
 				if (!split->path.size())
 					BuildPath(split->pts, ReverseSolution, false, split->path);
 				if (split->bounds.IsEmpty()) split->bounds = GetBounds(split->path);
 
-				if (split->bounds.Contains(outrec->bounds) && 
+				if (split->bounds.Contains(outrec->bounds) &&
 					Path1InsidePath2(outrec, split))
 				{
 					outrec->owner = split;
 					return true;
 				}
 			}
+		}
 
 		// only continue past here when not inside recursion
 		if (owner != outrec->owner) return false;
@@ -3405,7 +3430,6 @@ namespace Clipper2Lib {
 		{
 			if (is_inside_owner_bounds && Path1InsidePath2(outrec, outrec->owner))
 				return true;
-
 			// otherwise keep trying with owner's owner 
 			outrec->owner = outrec->owner->owner;
 			if (!outrec->owner) return true; // true or false
@@ -3425,7 +3449,6 @@ namespace Clipper2Lib {
 		for (OutRec* outrec : outrec_list_)
 		{
 			if (!outrec || !outrec->pts) continue;
-
 			if (outrec->is_open)
 			{
 				Path64 path;
@@ -3468,10 +3491,10 @@ namespace Clipper2Lib {
 
 	static void PolyPath64ToPolyPathD(const PolyPath64& polypath, PolyPathD& result)
 	{
-		for (const PolyPath64* child : polypath.childs())
+		for (auto child : polypath)
 		{
 			PolyPathD* res_child = result.AddChild(
-				Path64ToPathD(child->polygon()));
+				Path64ToPathD(child->Polygon()));
 			PolyPath64ToPolyPathD(*child, *res_child);
 		}
 	}

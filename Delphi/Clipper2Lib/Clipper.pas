@@ -2,8 +2,8 @@ unit Clipper;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  Clipper2 - beta                                                 *
-* Date      :  27 July 2022                                                    *
+* Version   :  Clipper2 - ver.1.0.0                                            *
+* Date      :  3 August 2022                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  This module provides a simple interface to the Clipper Library  *
@@ -92,11 +92,16 @@ function InflatePaths(const paths: TPathsD; delta: Double;
 jt: TJoinType = jtRound; et: TEndType = etPolygon;
 miterLimit: double = 2.0; precision: integer = 2): TPathsD; overload;
 
+function TranslatePath(const path: TPath64; dx, dy: Int64): TPath64; overload;
+function TranslatePath(const path: TPathD; dx, dy: double): TPathD; overload;
+function TranslatePaths(const paths: TPaths64; dx, dy: Int64): TPaths64; overload;
+function TranslatePaths(const paths: TPathsD; dx, dy: double): TPathsD; overload;
+
 function MinkowskiSum(const pattern, path: TPath64;
   pathIsClosed: Boolean): TPaths64;
 
-function PolyTreeToPaths(PolyTree: TPolyTree64): TPaths64;
-function PolyTreeDToPathsD(PolyTree: TPolyTreeD): TPathsD;
+function PolyTreeToPaths64(PolyTree: TPolyTree64): TPaths64;
+function PolyTreeToPathsD(PolyTree: TPolyTreeD): TPathsD;
 
 function MakePath(const ints: TArrayOfInteger): TPath64; overload;
 function MakePath(const dbls: TArrayOfDouble): TPathD; overload;
@@ -155,12 +160,12 @@ begin
     SetLength(Paths, i +1);
     Paths[i] := Poly.Polygon;
   end;
-  for i := 0 to Poly.ChildCount - 1 do
-    AddPolyNodeToPaths(TPolyPath64(Poly.Child[i]), Paths);
+  for i := 0 to Poly.Count - 1 do
+    AddPolyNodeToPaths(Poly[i], Paths);
 end;
 //------------------------------------------------------------------------------
 
-function PolyTreeToPaths(PolyTree: TPolyTree64): TPaths64;
+function PolyTreeToPaths64(PolyTree: TPolyTree64): TPaths64;
 begin
   Result := nil;
   AddPolyNodeToPaths(PolyTree, Result);
@@ -177,12 +182,12 @@ begin
     SetLength(Paths, i +1);
     Paths[i] := Poly.Polygon;
   end;
-  for i := 0 to Poly.ChildCount - 1 do
-    AddPolyNodeToPathsD(TPolyPathD(Poly.Child[i]), Paths);
+  for i := 0 to Poly.Count - 1 do
+    AddPolyNodeToPathsD(Poly[i], Paths);
 end;
 //------------------------------------------------------------------------------
 
-function PolyTreeDToPathsD(PolyTree: TPolyTreeD): TPathsD;
+function PolyTreeToPathsD(PolyTree: TPolyTreeD): TPathsD;
 begin
   Result := nil;
   AddPolyNodeToPathsD(PolyTree, Result);
@@ -337,6 +342,60 @@ begin
     free;
   end;
   Result := ScalePathsD(pp, invScale, invScale);
+end;
+//------------------------------------------------------------------------------
+
+function TranslatePath(const path: TPath64; dx, dy: Int64): TPath64;
+var
+  i, len: integer;
+begin
+  len := length(path);
+  setLength(result, len);
+  for i := 0 to len -1 do
+  begin
+    result[i].x := path[i].x + dx;
+    result[i].y := path[i].y + dy;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TranslatePath(const path: TPathD; dx, dy: double): TPathD;
+var
+  i, len: integer;
+begin
+  len := length(path);
+  setLength(result, len);
+  for i := 0 to len -1 do
+  begin
+    result[i].x := path[i].x + dx;
+    result[i].y := path[i].y + dy;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TranslatePaths(const paths: TPaths64; dx, dy: Int64): TPaths64;
+var
+  i, len: integer;
+begin
+  len := length(paths);
+  setLength(result, len);
+  for i := 0 to len -1 do
+  begin
+    result[i] := TranslatePath(paths[i], dx, dy);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TranslatePaths(const paths: TPathsD; dx, dy: double): TPathsD;
+var
+  i, len: integer;
+begin
+  len := length(paths);
+  setLength(result, len);
+  for i := 0 to len -1 do
+  begin
+    result[i] := TranslatePath(paths[i], dx, dy);
+  end;
 end;
 //------------------------------------------------------------------------------
 
