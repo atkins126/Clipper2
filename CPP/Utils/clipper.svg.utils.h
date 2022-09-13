@@ -11,8 +11,8 @@
 
 #include <cstdlib>
 #include <string>
-#include "../Clipper2Lib/clipper.h"
-#include "./clipper.svg.h"
+#include "clipper.h"
+#include "clipper.svg.h"
 #ifndef _WIN32
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -25,7 +25,7 @@ namespace Clipper2Lib {
   static const unsigned subj_stroke_clr = 0xCCB3B3DA;
   static const unsigned clip_brush_clr = 0x129C0000; 
   static const unsigned clip_stroke_clr = 0xCCFFA07A;
-  static const unsigned solution_brush_clr = 0x6666FF66;
+  static const unsigned solution_brush_clr = 0x4466FF66;
 
   inline bool FileExists(const std::string& name)
   {
@@ -68,7 +68,10 @@ namespace Clipper2Lib {
   inline void SvgAddOpenSubject(SvgWriter& svg,
     const PathsD& path, FillRule fillrule = FillRule::EvenOdd, bool is_joined = false)
   {
-    svg.AddPaths(path, !is_joined, fillrule, subj_brush_clr, subj_stroke_clr, 1.3, false);
+    if (is_joined)
+      svg.AddPaths(path, false, fillrule, subj_brush_clr, subj_stroke_clr, 1.3, false);
+    else
+      svg.AddPaths(path, true, fillrule, 0x0, subj_stroke_clr, 1.3, false);
   }
 
 

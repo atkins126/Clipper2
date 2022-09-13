@@ -1,7 +1,7 @@
 /*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  Clipper2 - ver.1.0.4                                            *
-* Date      :  4 August 2022                                                   *
+* Date      :  11 August 2022                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  Path Offset (Inflate/Shrink)                                    *
@@ -29,11 +29,11 @@ Paths64::size_type GetLowestPolygonIdx(const Paths64& paths)
 
 	for (Paths64::size_type i = 0 ; i < paths.size(); ++i)
 		for (const Point64& p : paths[i])
-			if (p.y > lp.y || (p.y == lp.y && p.x < lp.x))
-			{
-				result = i;
-				lp = p;
-			}	
+		{ 
+			if (p.y < lp.y || (p.y == lp.y && p.x >= lp.x)) continue;
+			result = i;
+			lp = p;
+		}	
 	return result;
 }
 
@@ -172,7 +172,7 @@ void ClipperOffset::DoSquare(PathGroup& group, const Path64& path, size_t j, siz
 
 	// now offset the original vertex delta units along unit vector
 	ptQ = PointD(path[j]);
-	ptQ = TranslatePoint(ptQ, delta_ * vec.x, delta_ * vec.y);
+	ptQ = TranslatePoint(ptQ, abs_delta_ * vec.x, abs_delta_ * vec.y);
 
 	// get perpendicular vertices
 	pt1 = TranslatePoint(ptQ, delta_ * vec.y, delta_ * -vec.x);
@@ -230,8 +230,9 @@ void ClipperOffset::OffsetPoint(PathGroup& group, Path64& path, size_t j, size_t
 	if (sin_a > 1.0) sin_a = 1.0;
 	else if (sin_a < -1.0) sin_a = -1.0;
 
+	bool almostNoAngle = AlmostZero(sin_a) && cos_a > 0;
 	// when there's almost no angle of deviation or it's concave
-	if ((AlmostZero(sin_a) && cos_a > 0) || (sin_a * delta_ < 0))
+	if (almostNoAngle || (sin_a * delta_ < 0))
 	{
 		Point64 p1 = Point64(
 			path[j].x + norms[k].x * delta_,
@@ -242,7 +243,8 @@ void ClipperOffset::OffsetPoint(PathGroup& group, Path64& path, size_t j, size_t
 		group.path_.push_back(p1);
 		if (p1 != p2)
 		{
-			group.path_.push_back(path[j]); // this aids with clipping removal later
+			// when concave add an extra vertex to ensure neat clipping
+			if (!almostNoAngle) group.path_.push_back(path[j]);
 			group.path_.push_back(p2);
 		}
 	}
@@ -355,16 +357,16 @@ void ClipperOffset::DoGroupOffset(PathGroup& group, double delta)
 		group.is_reversed_ = false;
 
 	delta_ = delta;
-	double absDelta = std::abs(delta_);
+	abs_delta_ = std::abs(delta_);
 	join_type_ = group.join_type_;
 
 	double arcTol = (arc_tolerance_ > floating_point_tolerance ? arc_tolerance_
-		: std::log10(2 + absDelta) * default_arc_tolerance); // empirically derived
+		: std::log10(2 + abs_delta_) * default_arc_tolerance); // empirically derived
 
 //calculate a sensible number of steps (for 360 deg for the given offset
 	if (group.join_type_ == JoinType::Round || group.end_type_ == EndType::Round)
 	{
-		steps_per_rad_ = PI / std::acos(1 - arcTol / absDelta) / (PI *2);
+		steps_per_rad_ = PI / std::acos(1 - arcTol / abs_delta_) / (PI *2);
 	}
 
 	bool is_closed_path = IsClosedPath(group.end_type_);
@@ -381,7 +383,7 @@ void ClipperOffset::DoGroupOffset(PathGroup& group, double delta)
 			//single vertex so build a circle or square ...
 			if (group.join_type_ == JoinType::Round)
 			{
-				double radius = absDelta;
+				double radius = abs_delta_;
 				if (group.end_type_ == EndType::Polygon) radius *= 0.5;
 				group.path_ = Ellipse(path[0], radius, radius);
 			}

@@ -1,7 +1,7 @@
 ﻿/*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  Clipper2 - ver.1.0.3                                            *
-* Date      :  20 August 2022                                                  *
+* Version   :  Clipper2 - ver.1.0.4                                            *
+* Date      :  11 September 2022                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  Path Offset (Inflate/Shrink)                                    *
@@ -60,7 +60,7 @@ namespace Clipper2Lib
     private readonly List<PathGroup> _pathGroups = new List<PathGroup>();
     private readonly PathD _normals = new PathD();
     private readonly Paths64 solution = new Paths64();
-    private double _delta, _tmpLimit, _stepsPerRad;
+    private double _delta, _abs_delta, _tmpLimit, _stepsPerRad;
     private JoinType _joinType;
     public double ArcTolerance { get; set; }
     public bool MergeGroups { get; set; }
@@ -99,21 +99,6 @@ namespace Clipper2Lib
       int cnt = paths.Count;
       if (cnt == 0) return;
       _pathGroups.Add(new PathGroup(paths, joinType, endType));
-    }
-
-    public void AddPath(PathD path, JoinType joinType, EndType endType)
-    {
-      int cnt = path.Count;
-      if (cnt == 0) return;
-      PathsD pp = new PathsD(1) { path };
-      AddPaths(pp, joinType, endType);
-    }
-
-    public void AddPaths(PathsD paths, JoinType joinType, EndType endType)
-    {
-      int cnt = paths.Count;
-      if (cnt == 0) return;
-      _pathGroups.Add(new PathGroup(Clipper.Paths64(paths), joinType, endType));
     }
 
     public Paths64 Execute(double delta)
@@ -170,18 +155,12 @@ namespace Clipper2Lib
       Point64 lp = new Point64(0, long.MinValue);
       int result = -1;
       for (int i = 0; i < paths.Count; i++)
-      {
-        Path64 p = paths[i];
-        for (int j = 0; j < p.Count; j++)
+        foreach (Point64 pt in paths[i])
         {
-          if (p[j].Y < lp.Y) continue;
-          if (p[j].Y > lp.Y || p[j].X < lp.X)
-          {
-            result = i;
-            lp = p[j];
-          }
+          if (pt.Y < lp.Y || (pt.Y == lp.Y && pt.X >= lp.X)) continue;
+          result = i;
+          lp = pt;
         }
-      }
       return result;
     }
 
@@ -228,15 +207,15 @@ namespace Clipper2Lib
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private PointD IntersectPoint(PointD pt1a, PointD pt1b, PointD pt2a, PointD pt2b)
     {
-      if (pt1a.x == pt1b.x) //vertical
+      if (InternalClipper.IsAlmostZero(pt1a.x - pt1b.x)) //vertical
       {
-        if (pt2a.x == pt2b.x) return new PointD(0, 0);
+        if (InternalClipper.IsAlmostZero(pt2a.x - pt2b.x)) return new PointD(0, 0);
         double m2 = (pt2b.y - pt2a.y) / (pt2b.x - pt2a.x);
         double b2 = pt2a.y - m2 * pt2a.x;
         return new PointD(pt1a.x, m2* pt1a.x + b2);
       }
 
-      if (pt2a.x == pt2b.x) //vertical
+      if (InternalClipper.IsAlmostZero(pt2a.x - pt2b.x)) //vertical
       {
         double m1 = (pt1b.y - pt1a.y) / (pt1b.x - pt1a.x);
         double b1 = pt1a.y - m1 * pt1a.x;
@@ -248,7 +227,7 @@ namespace Clipper2Lib
         double b1 = pt1a.y - m1 * pt1a.x;
         double m2 = (pt2b.y - pt2a.y) / (pt2b.x - pt2a.x);
         double b2 = pt2a.y - m2 * pt2a.x;
-        if (m1 == m2) return new PointD(0, 0);
+        if (InternalClipper.IsAlmostZero(m1 - m2)) return new PointD(0, 0);
         double x = (b2 - b1) / (m1 - m2);
         return new PointD(x, m1 * x + b1);
       }
@@ -268,7 +247,7 @@ namespace Clipper2Lib
 
       // now offset the original vertex delta units along unit vector
       ptQ = new PointD(path[j]);
-      ptQ = TranslatePoint(ptQ, _delta * vec.x, _delta * vec.y);
+      ptQ = TranslatePoint(ptQ, _abs_delta * vec.x, _abs_delta * vec.y);
 
       // get perpendicular vertices
       pt1 = TranslatePoint(ptQ, _delta * vec.y, _delta * -vec.x);
@@ -340,8 +319,8 @@ namespace Clipper2Lib
       if (sinA > 1.0) sinA = 1.0;
       else if (sinA < -1.0) sinA = -1.0;
 
-      // when there's almost no angle of deviation or it's concave
-      if ((AlmostZero(sinA) && cosA > 0) || (sinA * _delta < 0))
+      bool almostNoAngle = (AlmostZero(sinA) && cosA > 0); 
+      if (almostNoAngle || (sinA * _delta < 0))
       {
         Point64 p1 = new Point64(
             path[j].X + _normals[k].x * _delta,
@@ -352,7 +331,8 @@ namespace Clipper2Lib
         group._outPath.Add(p1);
         if (p1 != p2)
         {
-          group._outPath.Add(path[j]); // this aids with clipping removal later
+          // when concave add an extra vertex to ensure neat clipping
+          if (!almostNoAngle) group._outPath.Add(path[j]); 
           group._outPath.Add(p2);
         }
       }
@@ -480,7 +460,7 @@ namespace Clipper2Lib
         group._pathsReversed = false;
 
       _delta = delta;
-      double absDelta = Math.Abs(_delta);
+      _abs_delta = Math.Abs(_delta);
       _joinType = group._joinType;
 
       // calculate a sensible number of steps (for 360 deg for the given offset
@@ -488,9 +468,9 @@ namespace Clipper2Lib
       {
         double arcTol = ArcTolerance > 0.01 ?
               ArcTolerance :
-              Math.Log10(2 + absDelta) * 0.25; // empirically derived
+              Math.Log10(2 + _abs_delta) * 0.25; // empirically derived
         // get steps per 180 degrees (see offset_triginometry2.svg)
-        _stepsPerRad = Math.PI / Math.Acos(1 - arcTol / absDelta) / TwoPi;
+        _stepsPerRad = Math.PI / Math.Acos(1 - arcTol / _abs_delta) / TwoPi;
       }
 
       foreach (Path64 p in group._inPaths)
