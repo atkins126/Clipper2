@@ -6,9 +6,6 @@ using BenchmarkDotNet.Jobs;
 
 namespace Clipper2Lib.Benchmark
 {
-  using Path64 = List<Point64>;
-  using Paths64 = List<List<Point64>>;
-
   public class FastConfig : ManualConfig
     {
       public FastConfig()
@@ -16,7 +13,7 @@ namespace Clipper2Lib.Benchmark
         Add(DefaultConfig.Instance); 
         AddJob(Job.Default
             .WithLaunchCount(1)
-            .WithWarmupCount(1) 
+            .WithWarmupCount(1)
             .WithIterationCount(1)
         );
       }
@@ -38,11 +35,11 @@ namespace Clipper2Lib.Benchmark
         [GlobalSetup]
         public void GlobalSetup()
         {
-            Random rand = new Random();
+            Random rand = new ();
 
-            _subj = new Paths64();
-            _clip = new Paths64();
-            _solution = new Paths64();
+            _subj = new ();
+            _clip = new ();
+            _solution = new ();
 
             _subj.Add(MakeRandomPath(DisplayWidth, DisplayHeight, EdgeCount, rand));
             _clip.Add(MakeRandomPath(DisplayWidth, DisplayHeight, EdgeCount, rand));
@@ -51,7 +48,7 @@ namespace Clipper2Lib.Benchmark
         [Benchmark]
         public void Intersection_N()
         {
-            Clipper64 c = new Clipper64();
+            Clipper64 c = new ();
             c.AddSubject(_subj);
             c.AddClip(_clip);
             c.Execute(ClipType.Intersection, FillRule.NonZero, _solution);
@@ -70,7 +67,7 @@ namespace Clipper2Lib.Benchmark
         [Benchmark]
         public void Difference_N()
         {
-            Clipper c = new Clipper();
+            Clipper c = new ();
             c.AddSubject(_subj);
             c.AddClip(_clip);
             c.Execute(ClipType.Difference, FillRule.NonZero, _solution);
@@ -79,7 +76,7 @@ namespace Clipper2Lib.Benchmark
         [Benchmark]
         public void Xor_N()
         {
-            Clipper c = new Clipper();
+            Clipper c = new ();
             c.AddSubject(_subj);
             c.AddClip(_clip);
             c.Execute(ClipType.Xor, FillRule.NonZero, _solution);
@@ -88,13 +85,13 @@ namespace Clipper2Lib.Benchmark
         private static Point64 MakeRandomPt(int maxWidth, int maxHeight, Random rand)
         {
             long x = rand.Next(maxWidth);
-            var y = rand.Next(maxHeight);
+            long y = rand.Next(maxHeight);
             return new Point64(x, y);
         }
 
         public static Path64 MakeRandomPath(int width, int height, int count, Random rand)
         {
-            Path64 result = new Path64(count);
+            Path64 result = new (count);
             for (int i = 0; i < count; ++i)
                 result.Add(MakeRandomPt(width, height, rand));
             return result;

@@ -1,7 +1,6 @@
 ﻿/*******************************************************************************
-*                                                                              *
 * Author    :  Angus Johnson                                                   *
-* Date      :  16 May 2022                                                     *
+* Date      :  16 September 2022                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
@@ -15,18 +14,20 @@ using Clipper2Lib;
 namespace ClipperDemo1
 {
 
-  using Path64 = List<Point64>;
-  using Paths64 = List<List<Point64>>;
-  using PathsD = List<List<PointD>>;
-
   public class Application
   {
+
     public static void Main()
     {
+      DoSimpleShapes();
+      DoRabbit();
+    }
+
+    public static void DoSimpleShapes()
+    {
       //triangle offset - with large miter
-      Paths64 p = new Paths64();
-      p.Add(Clipper.MakePath(new int []{ 30, 150, 60, 350, 0, 350}));
-      Paths64 pp = new Paths64();
+      Paths64 p = new() { Clipper.MakePath(new int[] { 30, 150, 60, 350, 0, 350 }) };
+      Paths64 pp = new ();
       pp.AddRange(p);
 
       for (int i = 0; i < 5; ++i)
@@ -42,7 +43,7 @@ namespace ClipperDemo1
       pp.AddRange(p);
       //nb: using the ClipperOffest class directly here to control 
       //different join types within the same offset operation
-      ClipperOffset co = new ClipperOffset();
+      ClipperOffset co = new ();
       co.AddPaths(p, JoinType.Miter, EndType.Joined);
       p = Clipper.TranslatePaths(p, 120, 100);
       pp.AddRange(p);
@@ -50,56 +51,50 @@ namespace ClipperDemo1
       p = co.Execute(20);
       pp.AddRange(p);
 
-      SimpleSvgWriter svg = new SimpleSvgWriter();
+      SimpleSvgWriter svg = new ();
       SvgUtils.AddSolution(svg, pp, false);
       SvgUtils.SaveToFile(svg, "../../../inflate.svg", FillRule.EvenOdd, 800, 600, 20);
       ClipperFileIO.OpenFileWithDefaultApp("../../../inflate.svg");
+    }
 
-      // Because ClipperOffset uses integer coordinates,
-      // you'll need to scale coordinates when you 
-      // want/need fractional values ...
-      const double scale = 100;
+    public static void DoRabbit()
+    {
+      PathsD pd = LoadPathsFromResource("InflateDemo.rabbit.bin");
 
-      p = LoadPathsFromResource("InflateDemo.rabbit.bin");
-      p = Clipper.ScalePaths(p, scale);                    //scale up
-      pp.Clear();
-      pp.AddRange(p);
-
-      while (p.Count > 0)
+      PathsD solution = new (pd);
+      while (pd.Count > 0)
       {
         //don't forget to scale the delta offset
-        p = Clipper.InflatePaths(p, -2.5 * scale, JoinType.Round, EndType.Polygon);
+        pd = Clipper.InflatePaths(pd, -2.5, JoinType.Round, EndType.Polygon);
         //RamerDouglasPeucker - not essential but not only 
         //speeds up the loop but also tidies the result
-        p = Clipper.RamerDouglasPeucker(p, 0.025 * scale);
-        pp.AddRange(p);
+        pd = Clipper.RamerDouglasPeucker(pd, 0.025);
+        solution.AddRange(pd);
       }
-      PathsD ppp = Clipper.ScalePathsD(pp, 1/scale);       //scale back down
-      svg.ClearAll();
-      SvgUtils.AddSolution(svg, ppp, false);
+
+      SimpleSvgWriter svg = new ();
+      SvgUtils.AddSolution(svg, solution, false);
       SvgUtils.SaveToFile(svg, "../../../rabbit2.svg", FillRule.EvenOdd, 450, 720, 10);
       ClipperFileIO.OpenFileWithDefaultApp("../../../rabbit2.svg");
+    }
 
-    } //end Main()
-    //------------------------------------------------------------------------------
-
-    public static Paths64 LoadPathsFromResource(string resourceName)
+    public static PathsD LoadPathsFromResource(string resourceName)
     {
       using Stream stream = Assembly.GetExecutingAssembly().
         GetManifestResourceStream(resourceName);
-      if (stream == null) return new Paths64();
-      using BinaryReader reader = new BinaryReader(stream);
+      if (stream == null) return new PathsD();
+      using BinaryReader reader = new (stream);
       int len = reader.ReadInt32();
-      Paths64 result = new Paths64(len);
+      PathsD result = new (len);
       for (int i = 0; i < len; i++)
       {
         int len2 = reader.ReadInt32();
-        Path64 p = new Path64(len2);
+        PathD p = new (len2);
         for (int j = 0; j < len2; j++)
         {
           long X = reader.ReadInt64();
           long Y = reader.ReadInt64();
-          p.Add(new Point64(X, Y));
+          p.Add(new PointD(X, Y));
         }
         result.Add(p);
       }

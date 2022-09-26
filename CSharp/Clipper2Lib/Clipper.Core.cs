@@ -1,13 +1,14 @@
 ﻿/*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  Clipper2 - ver.1.0.3                                            *
-* Date      :  23 August 2022                                                  *
+* Version   :  Clipper2 - ver.1.0.4                                            *
+* Date      :  16 September 2022                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  Core structures and functions for the Clipper Library           *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************/
 
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -151,9 +152,9 @@ namespace Clipper2Lib
     }
 
 #endif
-    public override bool Equals(object obj)
+    public override bool Equals(object? obj)
     {
-      if (obj is Point64 p)
+      if (obj != null && obj is Point64 p)
         return this == p;
       return false;
     }
@@ -271,12 +272,14 @@ namespace Clipper2Lib
         !InternalClipper.IsAlmostZero(lhs.y - rhs.y);
     }
 
-    public override bool Equals(object obj)
+    public override bool Equals(object? obj)
     {
-      if (obj is PointD p)
+      if (obj != null && obj is PointD p)
         return this == p;
       return false;
     }
+
+    public void Negate() { x = -x; y = -y; }
 
     public override int GetHashCode() { return 0; }
   }
@@ -338,6 +341,17 @@ namespace Clipper2Lib
         rec.top >= top && rec.bottom <= bottom;
     }
 
+    public Path64 AsPath()
+    {
+      Path64 result = new Path64(4)
+      {
+        new Point64(left, top),
+        new Point64(right, top),
+        new Point64(right, bottom),
+        new Point64(left, bottom)
+      };
+      return result;
+    }
 
   }
 
@@ -394,6 +408,30 @@ namespace Clipper2Lib
 
   }
 
+  public class Path64 : List<Point64> 
+  {
+    public Path64(int capacity = 0) : base(capacity) { }
+    public Path64(IEnumerable<Point64> path) : base(path) { }
+  }
+  public class Paths64 : List<Path64>
+  {
+    public Paths64(int capacity = 0) : base(capacity) { }
+    public Paths64(IEnumerable<Path64> paths) : base(paths) { }
+  }
+
+  public class PathD : List<PointD>
+  {
+    public PathD(int capacity = 0) : base(capacity) { }
+    public PathD(IEnumerable<PointD> path) : base(path) { }
+  }
+
+  public class PathsD : List<PathD>
+  {
+    public PathsD(int capacity = 0) : base(capacity) { }
+    public PathsD(IEnumerable<PathD> paths) : base(paths) { }
+  }
+
+
   // Note: all clipping operations except for Difference are commutative.
   public enum ClipType
   {
@@ -431,7 +469,6 @@ namespace Clipper2Lib
 
   public static class InternalClipper
   {
-
     internal const double floatingPointTolerance = 1E-12;
     internal const double defaultMinimumEdgeLength = 0.1;
 

@@ -3,7 +3,7 @@ unit Clipper.Engine;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  Clipper2 - ver.1.0.4                                            *
-* Date      :  10 September 2022                                                *
+* Date      :  24 September 2022                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  This is the main polygon clipping module                        *
@@ -517,6 +517,22 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function DblToInt64(val: double): Int64; {$IFDEF INLINE} inline; {$ENDIF}
+var
+  exp: integer;
+  i64: UInt64 absolute val;
+begin
+  //https://en.wikipedia.org/wiki/Double-precision_floating-point_format
+  Result := 0;
+  if i64 = 0 then Exit;
+  exp := Integer(Cardinal(i64 shr 52) and $7FF) - 1023;
+  //nb: when exp == 1024 then val == INF or NAN.
+  if exp < 0 then Exit;
+  Result := ((i64 and $1FFFFFFFFFFFFF) shr (52 - exp)) or (UInt64(1) shl exp);
+  if val < 0 then Result := -Result;
+end;
+//------------------------------------------------------------------------------
+
 function GetIntersectPoint(e1, e2: PActive): TPoint64;
 var
   b1, b2, m: Double;
@@ -552,10 +568,13 @@ begin
     with e1^ do b1 := bot.X - bot.Y * dx;
     with e2^ do b2 := bot.X - bot.Y * dx;
     m := (b2-b1)/(e1.dx - e2.dx);
-    Result.Y := round(m);
+    //Result.Y := Round(m); //Round(m);
+    Result.Y := DblToInt64(m); //Round(m);
     if Abs(e1.dx) < Abs(e2.dx) then
-      Result.X := round(e1.dx * m + b1) else
-      Result.X := round(e2.dx * m + b2);
+      Result.X := DblToInt64(e1.dx * m + b1) else
+      Result.X := DblToInt64(e2.dx * m + b2);
+//      Result.X := Round(e1.dx * m + b1) else
+//      Result.X := Round(e2.dx * m + b2);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2361,12 +2380,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function PointBetween(const pt, corner1, corner2: TPoint64): Boolean;
+function PointEqualOrBetween(const pt, corner1, corner2: TPoint64): Boolean;
   {$IFDEF INLINING} inline; {$ENDIF}
 begin
   // nb: points may not be collinear
   Result := ValueEqualOrBetween(pt.X, corner1.X, corner2.X) and
     ValueEqualOrBetween(pt.Y, corner1.Y, corner2.Y);
+end;
+//------------------------------------------------------------------------------
+
+function PointBetween(const pt, corner1, corner2: TPoint64): Boolean;
+  {$IFDEF INLINING} inline; {$ENDIF}
+begin
+  // nb: points may not be collinear
+  Result := ValueBetween(pt.X, corner1.X, corner2.X) and
+    ValueBetween(pt.Y, corner1.Y, corner2.Y);
 end;
 //------------------------------------------------------------------------------
 
@@ -2457,7 +2485,7 @@ begin
         // by inserting an extra vertex if needed
         if not PointsEqual(op1.prev.pt, op2.next.pt) then
         begin
-          if PointBetween(op1.prev.pt, op2.pt, op2.next.pt) then
+          if PointEqualOrBetween(op1.prev.pt, op2.pt, op2.next.pt) then
             op2.next := InsertOp(op1.prev.pt, op2) else
             op1.prev := InsertOp(op2.next.pt, op1.prev);
         end;
@@ -2480,9 +2508,6 @@ begin
         opB.prev := opA;
         op1.prev := op2;
         op2.next := op1;
-
-//        SafeDeleteOutPtJoiners(op2);
-//        DisposeOutPt(op2);
 
         if (or1.idx < or2.idx) then
         begin
@@ -2517,7 +2542,7 @@ begin
         // by inserting an extra vertex if needed
         if not PointsEqual(op1.next.pt, op2.prev.pt) then
         begin
-          if PointBetween(op2.prev.pt, op1.pt, op1.next.pt) then
+          if PointEqualOrBetween(op2.prev.pt, op1.pt, op1.next.pt) then
             op1.next := InsertOp(op2.prev.pt, op1) else
             op2.prev := InsertOp(op1.next.pt, op2.prev);
         end;

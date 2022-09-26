@@ -1,31 +1,25 @@
 ﻿/*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Date      :  3 July 2022                                                     *
+* Date      :  16 September 2022                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
-* License:                                                                     *
-* Use, modification & distribution is subject to Boost Software License Ver 1. *
-* http://www.boost.org/LICENSE_1_0.txt                                         *
+* License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************/
 
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Diagnostics;
 
 namespace Clipper2Lib
 {
 
-  using Path64 = List<Point64>;
-  using Paths64 = List<List<Point64>>;
-
   public static class ClipperFileIO
   {
     public static Paths64 PathFromStr(string s)
     {
       if (s == null) return null;
-      Path64 p = new Path64();
-      Paths64 pp = new Paths64();
+      Path64 p = new ();
+      Paths64 pp = new ();
       int len = s.Length, i = 0, j;
       while (i < len)
       {
@@ -258,10 +252,10 @@ namespace Clipper2Lib
 
     public static Paths64 AffineTranslatePaths(Paths64 paths, long dx, long dy)
     {
-      Paths64 result = new Paths64(paths.Count);
+      Paths64 result = new (paths.Count);
       foreach (Path64 path in paths)
       {
-        Path64 p = new Path64(path.Count);
+        Path64 p = new (path.Count);
         foreach (Point64 pt in path)
           p.Add(new Point64(pt.X + dx, pt.Y + dy));
         result.Add(p);
@@ -273,8 +267,7 @@ namespace Clipper2Lib
     {
       string path = Path.GetFullPath(filename);
       if (!File.Exists(path)) return;
-      Process p = new Process();
-      p.StartInfo = new ProcessStartInfo(path) { UseShellExecute = true };
+      Process p = new() { StartInfo = new ProcessStartInfo(path) { UseShellExecute = true } };
       p.Start();
     }
 
