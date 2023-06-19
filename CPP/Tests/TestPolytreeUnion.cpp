@@ -1,13 +1,13 @@
 #include <gtest/gtest.h>
-#include "clipper.h"
+#include "clipper2/clipper.h"
 
 using namespace Clipper2Lib;
 
 TEST(Clipper2Tests, TestPolytreeUnion) {
 
     Paths64 subject;
-    subject.push_back(MakePath("0,0  0,5  5,5  5,0"));
-    subject.push_back(MakePath("1,1  1,6  6,6  6,1"));
+    subject.push_back(MakePath({ 0,0, 0,5, 5,5, 5,0 }));
+    subject.push_back(MakePath({ 1,1, 1,6, 6,6, 6,1 }));
 
     Clipper64 clipper;
     clipper.AddSubject(subject);

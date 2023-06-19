@@ -6,7 +6,6 @@
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************/
 
-using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using Clipper2Lib;
@@ -44,14 +43,14 @@ namespace ClipperDemo1
       //nb: using the ClipperOffest class directly here to control 
       //different join types within the same offset operation
       ClipperOffset co = new ();
-      co.AddPaths(p, JoinType.Miter, EndType.Joined);
+      co.AddPaths(p, JoinType.Square, EndType.Joined);
       p = Clipper.TranslatePaths(p, 120, 100);
       pp.AddRange(p);
       co.AddPaths(p, JoinType.Round, EndType.Joined);
-      p = co.Execute(20);
+      co.Execute(20, p);
       pp.AddRange(p);
 
-      SimpleSvgWriter svg = new ();
+      SvgWriter svg = new ();
       SvgUtils.AddSolution(svg, pp, false);
       SvgUtils.SaveToFile(svg, "../../../inflate.svg", FillRule.EvenOdd, 800, 600, 20);
       ClipperFileIO.OpenFileWithDefaultApp("../../../inflate.svg");
@@ -64,15 +63,15 @@ namespace ClipperDemo1
       PathsD solution = new (pd);
       while (pd.Count > 0)
       {
-        //don't forget to scale the delta offset
+        // and don't forget to scale the delta offset
         pd = Clipper.InflatePaths(pd, -2.5, JoinType.Round, EndType.Polygon);
-        //RamerDouglasPeucker - not essential but not only 
-        //speeds up the loop but also tidies the result
-        pd = Clipper.RamerDouglasPeucker(pd, 0.025);
+        // SimplifyPaths - is not essential but it not only 
+        // speeds up the loop but it also tidies the result
+        pd = Clipper.SimplifyPaths(pd, 0.2);
         solution.AddRange(pd);
       }
 
-      SimpleSvgWriter svg = new ();
+      SvgWriter svg = new ();
       SvgUtils.AddSolution(svg, solution, false);
       SvgUtils.SaveToFile(svg, "../../../rabbit2.svg", FillRule.EvenOdd, 450, 720, 10);
       ClipperFileIO.OpenFileWithDefaultApp("../../../rabbit2.svg");

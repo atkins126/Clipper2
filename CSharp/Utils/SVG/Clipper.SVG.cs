@@ -13,9 +13,8 @@ using System.IO;
 
 namespace Clipper2Lib
 {
-  public class SimpleSvgWriter
+  public class SvgWriter
   {
-
     public const uint black = 0xFF000000;
     public const uint white = 0xFFFFFFFF;
     public const uint maroon = 0xFF800000;
@@ -29,11 +28,10 @@ namespace Clipper2Lib
     public const uint fuscia = 0xFFFF00FF;
     public const uint aqua = 0xFF00FFFF;
 
-    private static RectD rectMax =
-      new (double.MaxValue, double.MaxValue, -double.MaxValue, -double.MaxValue);
+    private static RectD rectMax = Clipper.InvalidRectD;
     public static RectD RectMax => rectMax;
 
-    private static RectD rectEmpty = new (0, 0, 0, 0);
+    private static RectD rectEmpty = new RectD(true);
     public static RectD RectEmpty => rectEmpty;
     internal static bool IsValidRect(RectD rec)
     {
@@ -92,8 +90,8 @@ namespace Clipper2Lib
     }
 
     public FillRule FillRule { get; set; }
-    private readonly List<PolyInfo> PolyInfoList = new ();
-    private readonly List<TextInfo> textInfos = new ();
+    private readonly List<PolyInfo> PolyInfoList = new List<PolyInfo>();
+    private readonly List<TextInfo> textInfos = new List<TextInfo>();
     private readonly CoordStyle coordStyle;
 
     private const string svg_header = "<?xml version=\"1.0\" standalone=\"no\"?>\n" +
@@ -105,7 +103,7 @@ namespace Clipper2Lib
     private const string svg_path_format2 = "\"\n style=\"fill:none; stroke:{0};" +
         "stroke-opacity:{1:f2}; stroke-width:{2:f2};\"/>\n\n";
 
-    public SimpleSvgWriter(FillRule fillrule = FillRule.EvenOdd,
+    public SvgWriter(FillRule fillrule = FillRule.EvenOdd,
       string coordFontName = "Verdana", int coordFontsize = 9, uint coordFontColor = black)
     {
       coordStyle = new CoordStyle(coordFontName, coordFontsize, coordFontColor);
@@ -127,24 +125,70 @@ namespace Clipper2Lib
       PolyInfoList.Clear();
       textInfos.Clear();
     }
+    public void AddClosedPath(Path64 path, uint brushColor,
+      uint penColor, double penWidth, bool showCoords = false)
+    {
+      Paths64 tmp = new Paths64();
+      tmp.Add(path);
+      AddClosedPaths(tmp, brushColor, penColor, penWidth, showCoords);
+    }
 
+    public void AddClosedPath(PathD path, uint brushColor,
+      uint penColor, double penWidth, bool showCoords = false)
+    {
+      PathsD tmp = new PathsD();
+      tmp.Add(path);
+      AddClosedPaths(tmp, brushColor, penColor, penWidth, showCoords);
+    }
 
-    public void AddPaths(Paths64 paths, bool IsOpen, uint brushColor,
+    public void AddClosedPaths(Paths64 paths, uint brushColor,
       uint penColor, double penWidth, bool showCoords = false)
     {
       if (paths.Count == 0) return;
       PolyInfoList.Add(new PolyInfo(Clipper.PathsD(paths),
-        brushColor, penColor, penWidth, showCoords, IsOpen));
+        brushColor, penColor, penWidth, showCoords, false));
     }
-    //------------------------------------------------------------------------------
 
-    public void AddPaths(PathsD paths, bool IsOpen, uint brushColor,
+    public void AddClosedPaths(PathsD paths, uint brushColor,
       uint penColor, double penWidth, bool showCoords = false)
     {
       if (paths.Count == 0) return;
       PolyInfoList.Add(new PolyInfo(paths,
-        brushColor, penColor, penWidth, showCoords, IsOpen));
+        brushColor, penColor, penWidth, showCoords, false));
     }
+
+    public void AddOpenPath(Path64 path,  uint penColor, 
+      double penWidth, bool showCoords = false)
+    {
+      Paths64 tmp = new Paths64();
+      tmp.Add(path);
+      AddOpenPaths(tmp, penColor, penWidth, showCoords);
+    }
+
+    public void AddOpenPath(PathD path, uint penColor, 
+      double penWidth, bool showCoords = false)
+    {
+      PathsD tmp = new PathsD();
+      tmp.Add(path);
+      AddOpenPaths(tmp, penColor, penWidth, showCoords);
+    }
+
+    public void AddOpenPaths(Paths64 paths,
+      uint penColor, double penWidth, bool showCoords = false)
+    {
+      if (paths.Count == 0) return;
+      PolyInfoList.Add(new PolyInfo(Clipper.PathsD(paths),
+        0x0, penColor, penWidth, showCoords, true));
+    }
+
+    public void AddOpenPaths(PathsD paths, uint penColor, 
+      double penWidth, bool showCoords = false)
+    {
+      if (paths.Count == 0) return;
+      PolyInfoList.Add(new PolyInfo(paths,
+        0x0, penColor, penWidth, showCoords, true));
+    }
+
 
     public void AddText(string cap, int posX, int posY, int fontSize, uint fontClr = black)
     {
@@ -153,7 +197,7 @@ namespace Clipper2Lib
 
     private RectD GetBounds()
     {
-      RectD bounds = new (RectMax);
+      RectD bounds = new RectD(RectMax);
       foreach (PolyInfo pi in PolyInfoList)
         foreach (PathD path in pi.paths)
           foreach (PointD pt in path)
