@@ -1,8 +1,8 @@
 ﻿/*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Date      :  30 May 2023                                                     *
+* Date      :  5 July 2024                                                     *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2023                                         *
+* Copyright :  Angus Johnson 2010-2024                                         *
 * Purpose   :  FAST rectangular clipping                                       *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************/
@@ -41,7 +41,7 @@ namespace Clipper2Lib
     protected Rect64 pathBounds_;
     protected List<OutPt2?> results_;
     protected List<OutPt2?>[] edges_;
-    protected int currIdx_ = -1;
+    protected int currIdx_;
     internal RectClip64(Rect64 rect)
     {
       currIdx_ = -1;
@@ -195,7 +195,7 @@ namespace Clipper2Lib
     private static void AddToEdge(List<OutPt2?> edge, OutPt2 op)
     {
       if (op.edge != null) return;
-      op.edge = edge!;
+      op.edge = edge;
       edge.Add(op);
     }
 
@@ -275,6 +275,67 @@ namespace Clipper2Lib
       return true;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsHorizontal(Point64 pt1, Point64 pt2)
+    {
+      return pt1.Y == pt2.Y;
+    }
+
+    private static bool GetSegmentIntersection(Point64 p1,
+    Point64 p2, Point64 p3, Point64 p4, out Point64 ip)
+    {
+      double res1 = InternalClipper.CrossProduct(p1, p3, p4);
+      double res2 = InternalClipper.CrossProduct(p2, p3, p4);
+      if (res1 == 0)
+      {
+        ip = p1;
+        if (res2 == 0) return false; // segments are collinear
+        else if (p1 == p3 || p1 == p4) return true;
+        //else if (p2 == p3 || p2 == p4) { ip = p2; return true; }
+        else if (IsHorizontal(p3, p4)) return ((p1.X > p3.X) == (p1.X < p4.X));
+        else return ((p1.Y > p3.Y) == (p1.Y < p4.Y));
+      }
+      else if (res2 == 0)
+      {
+        ip = p2;
+        if (p2 == p3 || p2 == p4) return true;
+        else if (IsHorizontal(p3, p4)) return ((p2.X > p3.X) == (p2.X < p4.X));
+        else return ((p2.Y > p3.Y) == (p2.Y < p4.Y));
+      }
+
+      if ((res1 > 0) == (res2 > 0))
+      {
+        ip = new Point64(0, 0);
+        return false;
+      }
+
+      double res3 = InternalClipper.CrossProduct(p3, p1, p2);
+      double res4 = InternalClipper.CrossProduct(p4, p1, p2);
+      if (res3 == 0)
+      {
+        ip = p3;
+        if (p3 == p1 || p3 == p2) return true;
+        else if (IsHorizontal(p1, p2)) return ((p3.X > p1.X) == (p3.X < p2.X));
+        else return ((p3.Y > p1.Y) == (p3.Y < p2.Y));
+      }
+      else if (res4 == 0)
+      {
+        ip = p4;
+        if (p4 == p1 || p4 == p2) return true;
+        else if (IsHorizontal(p1, p2)) return ((p4.X > p1.X) == (p4.X < p2.X));
+        else return ((p4.Y > p1.Y) == (p4.Y < p2.Y));
+      }
+      if ((res3 > 0) == (res4 > 0)) 
+      {
+        ip = new Point64(0, 0);
+        return false;
+      }
+
+      // segments must intersect to get here
+      return InternalClipper.GetSegmentIntersectPt(p1, p2, p3, p4, out ip);
+    }
+  
+
     static protected bool GetIntersection(Path64 rectPath, Point64 p, Point64 p2, ref Location loc, out Point64 ip)
     {
       // gets the pt of intersection between rectPath and segment(p, p2) that's closest to 'p'
@@ -283,108 +344,88 @@ namespace Clipper2Lib
       switch (loc)
       {
         case Location.left:
-          if (InternalClipper.SegsIntersect(p, p2, rectPath[0], rectPath[3], true))
-          {
-            InternalClipper.GetIntersectPt(p, p2, rectPath[0], rectPath[3], out ip);
-          }
-          else if (p.Y < rectPath[0].Y &&
-            InternalClipper.SegsIntersect(p, p2, rectPath[0], rectPath[1], true))
-          {
-            InternalClipper.GetIntersectPt(p, p2, rectPath[0], rectPath[1], out ip);
+          if (GetSegmentIntersection(p, p2, rectPath[0], rectPath[3], out ip)) 
+            return true;
+          else if (p.Y < rectPath[0].Y && GetSegmentIntersection(p, p2, rectPath[0], rectPath[1], out ip))
+          { 
             loc = Location.top;
+            return true;
           }
-          else if (InternalClipper.SegsIntersect(p, p2, rectPath[2], rectPath[3], true))
-          {
-            InternalClipper.GetIntersectPt(p, p2, rectPath[2], rectPath[3], out ip);
+          else if (GetSegmentIntersection(p, p2, rectPath[2], rectPath[3], out ip))
+          { 
             loc = Location.bottom;
+            return true;
           }
           else return false;
-          break;
 
         case Location.right:
-          if (InternalClipper.SegsIntersect(p, p2, rectPath[1], rectPath[2], true))
-          {
-            InternalClipper.GetIntersectPt(p, p2, rectPath[1], rectPath[2], out ip);
-          }
-          else if (p.Y < rectPath[0].Y &&
-            InternalClipper.SegsIntersect(p, p2, rectPath[0], rectPath[1], true))
-          {
-            InternalClipper.GetIntersectPt(p, p2, rectPath[0], rectPath[1], out ip);
+          if (GetSegmentIntersection(p, p2, rectPath[1], rectPath[2], out ip))
+            return true;
+          else if (p.Y < rectPath[0].Y && GetSegmentIntersection(p, p2, rectPath[0], rectPath[1], out ip))
+          { 
             loc = Location.top;
+            return true;
           }
-          else if (InternalClipper.SegsIntersect(p, p2, rectPath[2], rectPath[3], true))
-          {
-            InternalClipper.GetIntersectPt(p, p2, rectPath[2], rectPath[3], out ip);
+          else if (GetSegmentIntersection(p, p2, rectPath[2], rectPath[3], out ip))
+          { 
             loc = Location.bottom;
+            return true;
           }
           else return false;
-          break;
 
         case Location.top:
-          if (InternalClipper.SegsIntersect(p, p2, rectPath[0], rectPath[1], true))
-          {
-            InternalClipper.GetIntersectPt(p, p2, rectPath[0], rectPath[1], out ip);
-          }
-          else if (p.X < rectPath[0].X &&
-            InternalClipper.SegsIntersect(p, p2, rectPath[0], rectPath[3], true))
-          {
-            InternalClipper.GetIntersectPt(p, p2, rectPath[0], rectPath[3], out ip);
+          if (GetSegmentIntersection(p, p2, rectPath[0], rectPath[1], out ip)) 
+            return true;
+          else if (p.X < rectPath[0].X && GetSegmentIntersection(p, p2, rectPath[0], rectPath[3], out ip))
+          { 
             loc = Location.left;
+            return true;
           }
-          else if (p.X > rectPath[1].X &&
-            InternalClipper.SegsIntersect(p, p2, rectPath[1], rectPath[2], true))
-          {
-            InternalClipper.GetIntersectPt(p, p2, rectPath[1], rectPath[2], out ip);
+          else if (p.X > rectPath[1].X && GetSegmentIntersection(p, p2, rectPath[1], rectPath[2], out ip))
+          { 
             loc = Location.right;
+            return true;
           }
           else return false;
-          break;
 
         case Location.bottom:
-          if (InternalClipper.SegsIntersect(p, p2, rectPath[2], rectPath[3], true))
+          if (GetSegmentIntersection(p, p2, rectPath[2], rectPath[3], out ip)) 
+            return true;
+          else if (p.X < rectPath[3].X && GetSegmentIntersection(p, p2, rectPath[0], rectPath[3], out ip))
           {
-            InternalClipper.GetIntersectPt(p, p2, rectPath[2], rectPath[3], out ip);
-          }
-          else if (p.X < rectPath[3].X &&
-            InternalClipper.SegsIntersect(p, p2, rectPath[0], rectPath[3], true))
-          {
-            InternalClipper.GetIntersectPt(p, p2, rectPath[0], rectPath[3], out ip);
             loc = Location.left;
+            return true;
           }
-          else if (p.X > rectPath[2].X &&
-            InternalClipper.SegsIntersect(p, p2, rectPath[1], rectPath[2], true))
+          else if (p.X > rectPath[2].X && GetSegmentIntersection(p, p2, rectPath[1], rectPath[2], out ip))
           {
-            InternalClipper.GetIntersectPt(p, p2, rectPath[1], rectPath[2], out ip);
             loc = Location.right;
+            return true;
           }
           else return false;
-          break;
 
-        case Location.inside:
-          if (InternalClipper.SegsIntersect(p, p2, rectPath[0], rectPath[3], true))
+        default:
+          if (GetSegmentIntersection(p, p2, rectPath[0], rectPath[3], out ip))
           {
-            InternalClipper.GetIntersectPt(p, p2, rectPath[0], rectPath[3], out ip);
             loc = Location.left;
+            return true;
           }
-          else if (InternalClipper.SegsIntersect(p, p2, rectPath[0], rectPath[1], true))
+          else if (GetSegmentIntersection(p, p2, rectPath[0], rectPath[1], out ip))
           {
-            InternalClipper.GetIntersectPt(p, p2, rectPath[0], rectPath[1], out ip);
             loc = Location.top;
+            return true;
           }
-          else if (InternalClipper.SegsIntersect(p, p2, rectPath[1], rectPath[2], true))
+          else if (GetSegmentIntersection(p, p2, rectPath[1], rectPath[2], out ip))
           {
-            InternalClipper.GetIntersectPt(p, p2, rectPath[1], rectPath[2], out ip);
             loc = Location.right;
+            return true;
           }
-          else if (InternalClipper.SegsIntersect(p, p2, rectPath[2], rectPath[3], true))
+          else if (GetSegmentIntersection(p, p2, rectPath[2], rectPath[3], out ip))
           {
-            InternalClipper.GetIntersectPt(p, p2, rectPath[2], rectPath[3], out ip);
             loc = Location.bottom;
+            return true;
           }
           else return false;
-          break;
       }
-      return true;
     }
 
     protected void GetNextLocation(Path64 path,
@@ -455,6 +496,23 @@ namespace Clipper2Lib
           }
           break;
       } // switch
+    }
+
+    private bool StartLocsAreClockwise(List<Location> startLocs)
+    {
+      int result = 0;
+      for (int i = 1; i < startLocs.Count; i++)
+      {
+        int d = (int)startLocs[i] - (int)startLocs[i - 1];
+        switch (d)
+        {
+          case -1: result -= 1; break;
+          case 1: result += 1; break;
+          case -3: result += 1; break;
+          case 3: result -= 1; break;
+        }
+      }
+      return result > 0;
     }
 
     private void ExecuteInternal(Path64 path)
@@ -544,7 +602,7 @@ namespace Clipper2Lib
           loc = prev;
           GetIntersection(rectPath_, 
             prevPt, path[i], ref loc, out Point64 ip2);
-          if (prevCrossLoc != Location.inside)
+          if (prevCrossLoc != Location.inside && prevCrossLoc != loc) //#597
             AddCorner(prevCrossLoc, loc);
 
           if (firstCross == Location.inside)
@@ -583,10 +641,12 @@ namespace Clipper2Lib
           if (pathBounds_.Contains(rect_) &&
             Path1ContainsPath2(path, rectPath_))
           {
+            bool startLocsClockwise = StartLocsAreClockwise(startLocs);
             for (int j = 0; j < 4; j++)
             {
-              Add(rectPath_[j]);
-              AddToEdge(edges_[j * 2], results_[0]!);
+              int k = startLocsClockwise ? j : 3 - j; // ie reverse result path
+              Add(rectPath_[k]);
+              AddToEdge(edges_[k * 2], results_[0]!);
             }
           }
         }
@@ -653,8 +713,8 @@ namespace Clipper2Lib
         if (op == null) continue;
         do
         {
-          if (InternalClipper.CrossProduct(
-            op2!.prev!.pt, op2.pt, op2.next!.pt) == 0)
+          if (InternalClipper.IsCollinear(
+            op2!.prev!.pt, op2.pt, op2.next!.pt))
           {
             if (op2 == op)
             {
@@ -889,8 +949,8 @@ namespace Clipper2Lib
       OutPt2? op2 = op.next;
       while (op2 != null && op2 != op)
       {
-        if (InternalClipper.CrossProduct(
-          op2!.prev!.pt, op2.pt, op2!.next!.pt) == 0)
+        if (InternalClipper.IsCollinear(
+          op2.prev!.pt, op2.pt, op2.next!.pt))
         {
           op = op2.prev;
           op2 = UnlinkOp(op2);
@@ -954,7 +1014,7 @@ namespace Clipper2Lib
       OutPt2 op2 = op.next!;
       while (op2 != op)
       {
-        result.Add(op2!.pt);
+        result.Add(op2.pt);
         op2 = op2.next!;
       }
       return result;
@@ -973,6 +1033,7 @@ namespace Clipper2Lib
         if (i > highI)
         {
           foreach (Point64 pt in path) Add(pt);
+          return;
         }                   
         if (prev == Location.inside) loc = Location.inside;
         i = 1;
@@ -1009,7 +1070,7 @@ namespace Clipper2Lib
           // intersect pt but we'll also need the first intersect pt (ip2)
           crossingLoc = prev;
           GetIntersection(rectPath_, prevPt, path[i], ref crossingLoc, out Point64 ip2);
-          Add(ip2);
+          Add(ip2, true);
           Add(ip);
         }
         else // path must be exiting rect
